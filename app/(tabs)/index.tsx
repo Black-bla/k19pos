@@ -2,13 +2,14 @@ import ModalBox from '@/components/ModalBox';
 import Screen from '@/components/Screen';
 import TableCard from "@/components/TableCard";
 import TableDetail from '@/components/TableDetail';
+import OrderManagementScreen from '@/components/screens/OrderManagementScreen';
 import { useTables } from "@/hooks/useTables";
 import { lipana } from "@/lib/lipana";
 import { supabase } from "@/lib/supabase";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
-import { Alert, FlatList, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Alert, FlatList, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 
 export default function TablesScreen() {
   const { tables, guestsByTable, loading, refetch } = useTables();
@@ -28,6 +29,14 @@ export default function TablesScreen() {
   
   // Table detail modal
   const [tableDetail, setTableDetail] = useState<{ open: boolean; tableId: string | null }>({ open: false, tableId: null });
+  
+  // Order management modal
+  const [orderManagement, setOrderManagement] = useState<{
+    open: boolean;
+    guestId?: string;
+    guestName?: string;
+    tableId?: string;
+  }>({ open: false });
   
   // Payment modal
   const [paymentModal, setPaymentModal] = useState<{ 
@@ -489,7 +498,28 @@ export default function TablesScreen() {
           onUpdateGuestStatus={handleUpdateGuestStatus}
           onOpenGuestOrder={handleOpenGuestOrder}
           onTriggerPayment={handleTriggerPayment}
+          onEditGuestOrders={(guestId, guestName) => {
+            setOrderManagement({
+              open: true,
+              guestId,
+              guestName,
+              tableId: tableDetail.tableId || undefined,
+            });
+          }}
         />
+      )}
+
+      {/* Order Management Modal */}
+      {orderManagement.open && orderManagement.guestId && (
+        <Modal visible={true} animationType="slide">
+          <OrderManagementScreen
+            guestId={orderManagement.guestId}
+            guestName={orderManagement.guestName || 'Guest'}
+            tableId={orderManagement.tableId || ''}
+            onClose={() => setOrderManagement({ open: false })}
+            onOrdersUpdated={refetch}
+          />
+        </Modal>
       )}
 
       {/* Payment Modal */}

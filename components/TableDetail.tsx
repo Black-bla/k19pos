@@ -14,11 +14,12 @@ interface Props {
   onUpdateGuestStatus: (guestId: string, status: GuestStatus) => Promise<void>;
   onOpenGuestOrder: (guestId: string) => void;
   onTriggerPayment: (guestId: string) => void;
+  onEditGuestOrders?: (guestId: string, guestName: string) => void;
 }
 
 const STATUS_ORDER: GuestStatus[] = ['pending', 'ordered', 'served', 'cleared', 'pending_payment', 'paid'];
 
-export default function TableDetail({ table, guests, onClose, onAddGuest, onUpdateGuestStatus, onOpenGuestOrder, onTriggerPayment }: Props) {
+export default function TableDetail({ table, guests, onClose, onAddGuest, onUpdateGuestStatus, onOpenGuestOrder, onTriggerPayment, onEditGuestOrders }: Props) {
   const [guestOrders, setGuestOrders] = useState<Record<string, GuestOrder[]>>({});
   const [loadingOrders, setLoadingOrders] = useState(false);
   const [addingSeat, setAddingSeat] = useState<number | null>(null);
@@ -156,6 +157,14 @@ export default function TableDetail({ table, guests, onClose, onAddGuest, onUpda
                   >
                     <Text style={styles.smallBtnText}>Order</Text>
                   </Pressable>
+                  {orders.length > 0 && (
+                    <Pressable 
+                      style={[styles.smallBtn, styles.smallBtnInfo]} 
+                      onPress={() => onEditGuestOrders?.(guest.id, guest.guest_name)}
+                    >
+                      <Text style={styles.smallBtnText}>Edit</Text>
+                    </Pressable>
+                  )}
                   <Pressable
                     style={[styles.smallBtn, styles.smallBtnSecondary]}
                     onPress={async () => {
@@ -445,6 +454,9 @@ const styles = StyleSheet.create({
   },
   smallBtnPrimary: {
     backgroundColor: '#0ea5e9',
+  },
+  smallBtnInfo: {
+    backgroundColor: '#8b5cf6',
   },
   smallBtnSecondary: {
     backgroundColor: '#f1f5f9',
