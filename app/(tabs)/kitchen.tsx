@@ -394,17 +394,46 @@ export default function KitchenScreen() {
                     </View>
                     <View
                       style={[
-                        styles.statusDot,
+                        styles.statusContainer,
                         {
                           backgroundColor:
                             courseStatus === 'ready'
-                              ? '#10b981'
+                              ? '#dcfce7'
                               : courseStatus === 'preparing'
-                                ? '#f59e0b'
-                                : '#ef4444',
+                                ? '#fef3c7'
+                                : '#fee2e2',
                         },
                       ]}
-                    />
+                    >
+                      <View
+                        style={[
+                          styles.statusDot,
+                          {
+                            backgroundColor:
+                              courseStatus === 'ready'
+                                ? '#10b981'
+                                : courseStatus === 'preparing'
+                                  ? '#f59e0b'
+                                  : '#ef4444',
+                          },
+                        ]}
+                      />
+                      <Text
+                        style={[
+                          styles.statusLabel,
+                          {
+                            color:
+                              courseStatus === 'ready'
+                                ? '#10b981'
+                                : courseStatus === 'preparing'
+                                  ? '#f59e0b'
+                                  : '#ef4444',
+                          },
+                        ]}
+                      >
+                        {courseStatus.charAt(0).toUpperCase() + courseStatus.slice(1)}
+                      </Text>
+                    </View>
                   </View>
 
                   {/* Dishes in this course */}
@@ -665,6 +694,23 @@ const styles = StyleSheet.create({
   courseItemDisabled: {
     opacity: 0.6,
   },
+  statusContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    gap: 6,
+  },
+  statusDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+  },
+  statusLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
   dishesContainer: {
     marginTop: 10,
     paddingTop: 10,
@@ -691,11 +737,6 @@ const styles = StyleSheet.create({
   itemName: {
     fontSize: 12,
     color: '#64748b',
-  },
-  statusDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
   },
   orderFooter: {
     gap: 8,
