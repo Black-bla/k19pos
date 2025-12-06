@@ -79,12 +79,17 @@ export default function KitchenScreen() {
   useEffect(() => {
     fetchOrders();
 
-    // Subscribe to real-time updates
+    // Subscribe to real-time updates from guest_orders
     const channel = supabase
-      .channel('kitchen-orders')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'guest_orders' }, () => {
-        fetchOrders();
-      })
+      .channel('kitchen-orders-realtime')
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'guest_orders' },
+        (payload) => {
+          // Refetch orders when any status changes
+          fetchOrders();
+        }
+      )
       .subscribe();
 
     return () => {

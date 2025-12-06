@@ -35,12 +35,17 @@ export default function TableDetail({ table, guests, onClose, onAddGuest, onUpda
 
     // Subscribe to guest_orders changes for real-time updates
     const channel = supabase
-      .channel('table-guest-orders')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'guest_orders' }, () => {
-        if (activeGuests.length > 0) {
-          fetchGuestOrders();
+      .channel(`table-guest-orders-${table.id}`)
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'guest_orders' },
+        (payload) => {
+          // Refetch orders when status changes anywhere
+          if (activeGuests.length > 0) {
+            fetchGuestOrders();
+          }
         }
-      })
+      )
       .subscribe();
 
     return () => {
