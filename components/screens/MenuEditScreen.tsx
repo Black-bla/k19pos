@@ -3,9 +3,8 @@ import Screen from '@/components/Screen';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from "@/lib/supabase";
 import { Ionicons } from '@expo/vector-icons';
-import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from "react";
-import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { Calendar } from 'react-native-calendars';
 import { MenuItem } from "../../lib/types";
 
@@ -20,10 +19,15 @@ type MenuSlot = {
   vegetable?: MenuItem;
 };
 
-export default function MenuScreen() {
+interface MenuEditScreenProps {
+  serviceDate: string;
+  onClose: () => void;
+}
+
+export default function MenuEditScreen({ serviceDate: initialServiceDate, onClose }: MenuEditScreenProps) {
   const auth = useAuth();
-  const router = useRouter();
-  const params = useLocalSearchParams();
+  const ownerId = auth.user?.id || '';
+  const isOwner = !!auth.user?.id;
   const [menu, setMenu] = useState<MenuItem[]>([]);
   const [drinks, setDrinks] = useState<MenuItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -44,12 +48,8 @@ export default function MenuScreen() {
   const [editPrice, setEditPrice] = useState<string>("");
   
   // Service date state
-  const [originalServiceDate, setOriginalServiceDate] = useState<string>(
-    (params.date as string) || new Date().toISOString().split('T')[0]
-  );
-  const [serviceDate, setServiceDate] = useState<string>(
-    (params.date as string) || new Date().toISOString().split('T')[0]
-  );
+  const [originalServiceDate, setOriginalServiceDate] = useState<string>(initialServiceDate);
+  const [serviceDate, setServiceDate] = useState<string>(initialServiceDate);
   const [showDatePicker, setShowDatePicker] = useState(false);
 
   // Define the fixed slots for starters, mains, and desserts
@@ -63,18 +63,22 @@ export default function MenuScreen() {
   ];
 
   useEffect(() => {
+    if (!isOwner) {
+      onClose();
+      return;
+    }
     // Only fetch when screen first loads, using original date
     fetchMenu();
   }, []);
 
-  // Handle date changes - update all items to new date
   async function handleDateChange(newDate: string) {
+    if (!isOwner) return;
     if (newDate !== serviceDate && menu.length > 0) {
       // Update all existing menu items to the new date
       const { error } = await supabase
         .from('menu_items')
         .update({ service_date: newDate })
-        .eq('created_by', auth.user?.id)
+        .eq('created_by', ownerId)
         .eq('service_date', serviceDate);
       
       if (error) {
@@ -86,10 +90,22 @@ export default function MenuScreen() {
   }
 
   async function fetchMenu() {
+    if (!isOwner) {
+      setLoading(false);
+      return;
+    }
+
+    if (!ownerId) {
+      setMenu([]);
+      setDrinks([]);
+      setLoading(false);
+      return;
+    }
+
     const { data } = await supabase
       .from("menu_items")
       .select("*")
-      .eq('created_by', auth.user?.id)
+      .eq('created_by', ownerId)
       .eq('service_date', originalServiceDate)
       .order("name");
     if (data) {
@@ -100,6 +116,10 @@ export default function MenuScreen() {
   }
 
   async function handleAddMenuItem() {
+    if (!isOwner) {
+      Alert.alert('View only', 'You can only edit menus you created.');
+      return;
+    }
     if (!selectedSlot) {
       Alert.alert("Error", "No slot selected");
       return;
@@ -144,7 +164,7 @@ export default function MenuScreen() {
           subcategory: 'MEAT', 
           meal_option: selectedSlot.option, 
           available: true,
-          created_by: auth.user?.id,
+          created_by: ownerId,
           service_date: serviceDate
         });
         
@@ -161,7 +181,7 @@ export default function MenuScreen() {
           subcategory: 'CARBOHYDRATE', 
           meal_option: selectedSlot.option, 
           available: true,
-          created_by: auth.user?.id,
+          created_by: ownerId,
           service_date: serviceDate
         });
         
@@ -178,7 +198,7 @@ export default function MenuScreen() {
           subcategory: 'VEGETABLE', 
           meal_option: selectedSlot.option, 
           available: true,
-          created_by: auth.user?.id,
+          created_by: ownerId,
           service_date: serviceDate
         });
         
@@ -220,7 +240,7 @@ export default function MenuScreen() {
           price, 
           category: selectedSlot?.category || 'DRINKS', 
           available: true,
-          created_by: auth.user?.id,
+          created_by: ownerId,
           service_date: serviceDate
         });
         
@@ -242,12 +262,14 @@ export default function MenuScreen() {
   }
 
   async function handleRemoveMenuItem(id: string) {
+    if (!isOwner) return;
     const { error } = await supabase.from("menu_items").delete().eq("id", id);
     if (error) Alert.alert("Error", error.message);
     fetchMenu();
   }
 
   async function handleToggleAvailability(id: string, available: boolean) {
+    if (!isOwner) return;
     await supabase.from('menu_items').update({ available: !available }).eq('id', id);
     fetchMenu();
   }
@@ -315,13 +337,24 @@ export default function MenuScreen() {
     }
   }
 
+  if (!isOwner) {
+    return (
+      <Screen style={styles.container}>
+        <View style={styles.centered}>
+          <ActivityIndicator size="large" color="#0ea5e9" />
+          <Text style={styles.loadingText}>Redirecting to menu view...</Text>
+        </View>
+      </Screen>
+    );
+  }
+
   return (
     <Screen style={styles.container}>
       <View style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.backButton}>
+        <Pressable onPress={onClose} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color="#0f172a" />
         </Pressable>
-        <Text style={styles.title}>Menu Management</Text>
+          <Text style={styles.title}>Menu Management</Text>
         <View style={{ width: 40 }} />
       </View>
 
@@ -439,16 +472,18 @@ export default function MenuScreen() {
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>Drinks</Text>
-              <Pressable 
-                style={styles.addDrinkBtn}
-                onPress={() => {
-                  setSelectedSlot({ id: 'drink', category: 'DRINKS' as any, option: 'A' });
-                  setAddModalOpen(true);
-                }}
-              >
-                <Ionicons name="add" size={20} color="#fff" />
-                <Text style={styles.addDrinkText}>Add Drink</Text>
-              </Pressable>
+              {isOwner ? (
+                <Pressable 
+                  style={styles.addDrinkBtn}
+                  onPress={() => {
+                    setSelectedSlot({ id: 'drink', category: 'DRINKS' as any, option: 'A' });
+                    setAddModalOpen(true);
+                  }}
+                >
+                  <Ionicons name="add" size={20} color="#fff" />
+                  <Text style={styles.addDrinkText}>Add Drink</Text>
+                </Pressable>
+              ) : null}
             </View>
             <View style={styles.drinksList}>
               {drinks.map(drink => (
@@ -457,12 +492,14 @@ export default function MenuScreen() {
                     <Text style={styles.drinkName}>{drink.name}</Text>
                     <Text style={styles.drinkPrice}>KSh {drink.price.toFixed(2)}</Text>
                   </View>
-                  <Pressable 
-                    style={styles.removeDrinkBtn}
-                    onPress={() => handleRemoveMenuItem(drink.id)}
-                  >
-                    <Ionicons name="trash" size={18} color="#ef4444" />
-                  </Pressable>
+                  {isOwner ? (
+                    <Pressable 
+                      style={styles.removeDrinkBtn}
+                      onPress={() => handleRemoveMenuItem(drink.id)}
+                    >
+                      <Ionicons name="trash" size={18} color="#ef4444" />
+                    </Pressable>
+                  ) : null}
                 </View>
               ))}
             </View>
@@ -856,5 +893,14 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: '#fff',
+  },
+  centered: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+  },
+  loadingText: {
+    color: '#64748b',
   },
 });

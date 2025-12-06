@@ -8,6 +8,7 @@ interface Props {
   onClose: () => void;
   onConfirm?: () => void;
   confirmLabel?: string;
+  confirmDisabled?: boolean;
   cancelLabel?: string;
   showFooter?: boolean;
   scrollable?: boolean;
@@ -20,6 +21,7 @@ export default function ModalBox({
   onClose,
   onConfirm,
   confirmLabel = 'Confirm',
+  confirmDisabled = false,
   cancelLabel = 'Cancel',
   showFooter = true,
   scrollable = true,
@@ -50,8 +52,9 @@ export default function ModalBox({
           </Pressable>
           {onConfirm && (
             <Pressable 
-              style={[styles.btn, styles.confirmBtn]} 
+              style={[styles.btn, styles.confirmBtn, confirmDisabled && styles.confirmBtnDisabled]} 
               onPress={onConfirm}
+              disabled={confirmDisabled}
             >
               <Text style={styles.confirmBtnText}>{confirmLabel}</Text>
             </Pressable>
@@ -187,6 +190,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 4,
+  },
+  confirmBtnDisabled: {
+    opacity: 0.6,
   },
   confirmBtnText: {
     color: '#fff',

@@ -1,6 +1,7 @@
 import { mapGuestStatusToBadge } from '@/lib/statusMap';
-import { Guest, GuestStatus, Table } from '@/lib/types';
-import { useState } from 'react';
+import { supabase } from '@/lib/supabase';
+import { Guest, GuestOrder, GuestStatus, Table } from '@/lib/types';
+import { useEffect, useState } from 'react';
 import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import ModalBox from './ModalBox';
 import StatusBadge from './StatusBadge';
@@ -18,8 +19,61 @@ interface Props {
 const STATUS_ORDER: GuestStatus[] = ['pending', 'ordered', 'served', 'cleared', 'pending_payment', 'paid'];
 
 export default function TableDetail({ table, guests, onClose, onAddGuest, onUpdateGuestStatus, onOpenGuestOrder, onTriggerPayment }: Props) {
+  const [guestOrders, setGuestOrders] = useState<Record<string, GuestOrder[]>>({});
+  const [loadingOrders, setLoadingOrders] = useState(false);
   const [addingSeat, setAddingSeat] = useState<number | null>(null);
   const [guestName, setGuestName] = useState('');
+
+  // Only count guests who haven't paid (paid guests have left)
+  const activeGuests = guests.filter(g => g.status !== 'paid');
+
+  useEffect(() => {
+    if (activeGuests.length > 0) {
+      fetchGuestOrders();
+    }
+
+    // Subscribe to guest_orders changes for real-time updates
+    const channel = supabase
+      .channel('table-guest-orders')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'guest_orders' }, () => {
+        if (activeGuests.length > 0) {
+          fetchGuestOrders();
+        }
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [guests]);
+
+  async function fetchGuestOrders() {
+    setLoadingOrders(true);
+    try {
+      const guestIds = activeGuests.map(g => g.id);
+      const { data, error } = await supabase
+        .from('guest_orders')
+        .select('*')
+        .in('guest_id', guestIds);
+
+      if (error) throw error;
+
+      // Group orders by guest_id
+      const ordersByGuest: Record<string, GuestOrder[]> = {};
+      data?.forEach((order) => {
+        if (!ordersByGuest[order.guest_id]) {
+          ordersByGuest[order.guest_id] = [];
+        }
+        ordersByGuest[order.guest_id].push(order);
+      });
+
+      setGuestOrders(ordersByGuest);
+    } catch (err) {
+      console.error('Failed to fetch guest orders:', err);
+    } finally {
+      setLoadingOrders(false);
+    }
+  }
 
   function nextStatus(current: GuestStatus) {
     const idx = STATUS_ORDER.indexOf(current);
@@ -44,9 +98,6 @@ export default function TableDetail({ table, guests, onClose, onAddGuest, onUpda
   // When guests exist, show guest action cards; otherwise show seat list for adding
   const hasGuests = guests.length > 0;
   
-  // Only count guests who haven't paid (paid guests have left)
-  const activeGuests = guests.filter(g => g.status !== 'paid');
-  
   // Empty seats are those without active guests
   const emptySeats = Array.from({ length: table.seat_count }, (_, i) => i + 1).filter(
     seatNum => !activeGuests.find(g => g.seat_number === seatNum)
@@ -64,16 +115,41 @@ export default function TableDetail({ table, guests, onClose, onAddGuest, onUpda
         <View style={styles.section}>
           <Text style={styles.sectionLabel}>Seated Guests</Text>
           <View style={styles.actionButtons}>
-            {activeGuests.map((guest) => (
-              <View key={guest.id} style={styles.guestActionGroup}>
-                <View style={styles.guestHeader}>
-                  <View style={styles.guestInfo}>
-                    <Text style={styles.guestActionName}>{guest.guest_name}</Text>
-                    <Text style={styles.seatLabel}>Seat {guest.seat_number}</Text>
+            {activeGuests.map((guest) => {
+              const orders = guestOrders[guest.id] || [];
+              const totalAmount = orders.reduce((sum, order) => sum + (order.price_snapshot * order.quantity), 0);
+              
+              return (
+                <View key={guest.id} style={styles.guestActionGroup}>
+                  <View style={styles.guestHeader}>
+                    <View style={styles.guestInfo}>
+                      <Text style={styles.guestActionName}>{guest.guest_name}</Text>
+                      <Text style={styles.seatLabel}>Seat {guest.seat_number}</Text>
+                    </View>
+                    <StatusBadge status={mapGuestStatusToBadge(guest.status)} label={guest.status} />
                   </View>
-                  <StatusBadge status={mapGuestStatusToBadge(guest.status)} label={guest.status} />
-                </View>
-                <View style={styles.buttonRow}>
+                  
+                  {/* Display orders if any */}
+                  {orders.length > 0 && (
+                    <View style={styles.ordersList}>
+                      {orders.map((order) => (
+                        <View key={order.id} style={styles.orderItem}>
+                          <Text style={styles.orderItemName}>
+                            {order.quantity}x {order.menu_item_name}
+                          </Text>
+                          <Text style={styles.orderItemPrice}>
+                            KSh {(order.price_snapshot * order.quantity).toFixed(2)}
+                          </Text>
+                        </View>
+                      ))}
+                      <View style={styles.orderTotal}>
+                        <Text style={styles.orderTotalLabel}>Total:</Text>
+                        <Text style={styles.orderTotalAmount}>KSh {totalAmount.toFixed(2)}</Text>
+                      </View>
+                    </View>
+                  )}
+                  
+                  <View style={styles.buttonRow}>
                   <Pressable 
                     style={[styles.smallBtn, styles.smallBtnPrimary]} 
                     onPress={() => onOpenGuestOrder(guest.id)}
@@ -103,7 +179,8 @@ export default function TableDetail({ table, guests, onClose, onAddGuest, onUpda
                   )}
                 </View>
               </View>
-            ))}
+            );
+            })}
           </View>
         </View>
       )}
@@ -311,6 +388,49 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#0f172a',
     marginBottom: 10,
+  },
+  ordersList: {
+    marginTop: 12,
+    padding: 12,
+    backgroundColor: '#f8fafc',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  orderItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  orderItemName: {
+    fontSize: 13,
+    color: '#475569',
+    flex: 1,
+  },
+  orderItemPrice: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#0f172a',
+  },
+  orderTotal: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#cbd5e1',
+  },
+  orderTotalLabel: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#0f172a',
+  },
+  orderTotalAmount: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#10b981',
   },
   buttonRow: {
     flexDirection: 'row',

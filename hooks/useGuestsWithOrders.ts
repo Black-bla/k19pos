@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 
 export interface GuestWithOrders extends Guest {
   orders: GuestOrder[];
+  table_name?: string;
 }
 
 export function useGuestsWithOrders() {
@@ -24,10 +25,10 @@ export function useGuestsWithOrders() {
 
   async function fetchGuests() {
     try {
-      // Fetch all guests
+      // Fetch all guests with table info
       const { data: guestsData, error: guestsError } = await supabase
         .from('guests')
-        .select('*')
+        .select('*, tables(name)')
         .order('created_at', { ascending: false });
 
       if (guestsError) throw guestsError;
@@ -46,8 +47,9 @@ export function useGuestsWithOrders() {
       if (ordersError) throw ordersError;
 
       // Map orders to guests
-      const guestsWithOrders: GuestWithOrders[] = guestsData.map(guest => ({
+      const guestsWithOrders: GuestWithOrders[] = guestsData.map((guest: any) => ({
         ...guest,
+        table_name: guest.tables?.name || guest.table_id,
         orders: ordersData?.filter(o => o.guest_id === guest.id) || [],
       }));
 

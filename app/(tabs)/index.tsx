@@ -3,6 +3,7 @@ import Screen from '@/components/Screen';
 import TableCard from "@/components/TableCard";
 import TableDetail from '@/components/TableDetail';
 import { useTables } from "@/hooks/useTables";
+import { lipana } from "@/lib/lipana";
 import { supabase } from "@/lib/supabase";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
@@ -34,7 +35,9 @@ export default function TablesScreen() {
     guestId?: string; 
     guestName?: string;
     amount?: number;
+    phone?: string;
   }>({ open: false });
+  const [processingPayment, setProcessingPayment] = useState(false);
 
   useEffect(() => {
     fetchWaiters();
@@ -204,84 +207,115 @@ export default function TablesScreen() {
   }
 
   async function handleOpenGuestOrder(guestId: string) {
-    try {
-      const { data: guest } = await supabase
-        .from('guests')
-        .select('table_id')
-        .eq('id', guestId)
-        .single();
-      
-      if (!guest) {
-        Alert.alert('Error', 'Guest not found');
-        return;
-      }
-
-      const { data: order } = await supabase
-        .from('orders')
-        .select('id')
-        .eq('table_id', guest.table_id)
-        .eq('status', 'open')
-        .single();
-
-      if (order) {
-        router.push(`/order/${order.id}?guestId=${guestId}`);
-      } else {
-        Alert.alert('No Order', 'No active order found for this table');
-      }
-    } catch (err) {
-      console.error('Open guest order failed', err);
-      Alert.alert('Error', 'Failed to open order');
-    }
+    // Navigate directly to order screen with guestId
+    // Orders are per-guest, not per-table
+    router.push(`/order/${guestId}`);
   }
 
   // ========== PAYMENT ==========
 
-  function handleTriggerPayment(guestId: string) {
+  async function handleTriggerPayment(guestId: string) {
     const tableId = tableDetail.tableId;
     if (!tableId) return;
 
     const guest = (guestsByTable[tableId] || []).find(g => g.id === guestId);
     if (!guest) return;
 
-    // Calculate guest's order total (you'll need to implement this based on your order items)
-    setPaymentModal({ 
-      open: true, 
-      guestId, 
-      guestName: guest.guest_name,
-      amount: 0 // TODO: Calculate from guest_orders
-    });
+    // Fetch guest's orders and calculate total
+    try {
+      const { data: orders, error } = await supabase
+        .from('guest_orders')
+        .select('quantity, price_snapshot')
+        .eq('guest_id', guestId);
+
+      if (error) throw error;
+
+      const total = orders?.reduce((sum, order) => {
+        return sum + (order.quantity * order.price_snapshot);
+      }, 0) || 0;
+
+      setPaymentModal({ 
+        open: true, 
+        guestId, 
+        guestName: guest.guest_name,
+        amount: total,
+        phone: ''
+      });
+    } catch (err) {
+      console.error('Failed to calculate payment amount:', err);
+      Alert.alert('Error', 'Failed to calculate payment amount');
+    }
   }
 
   async function handleConfirmPayment() {
-    const { guestId } = paymentModal;
-    if (!guestId) return;
+    const { guestId, amount, phone } = paymentModal;
+    if (!guestId || !amount || !phone) {
+      Alert.alert('Error', 'Please enter phone number');
+      return;
+    }
+
+    // Validate minimum amount
+    if (amount < 10) {
+      Alert.alert('Error', 'Minimum payment amount is KES 10');
+      return;
+    }
+
+    setProcessingPayment(true);
 
     try {
-      // TODO: Implement actual M-Pesa STK Push here
-      // For now, just mark as paid
-      await supabase.from('guests').update({ status: 'paid' }).eq('id', guestId);
-      
-      setPaymentModal({ open: false });
-      
-      // Check if all guests are paid
-      const tableId = tableDetail.tableId;
-      if (tableId) {
-        const { data: allGuests } = await supabase
-          .from('guests')
-          .select('status')
-          .eq('table_id', tableId);
-        
-        if (allGuests && allGuests.every(g => g.status === 'paid')) {
-          await supabase.from('tables').update({ status: 'available' }).eq('id', tableId);
-          setTableDetail({ open: false, tableId: null });
-          Alert.alert('Success', 'All guests paid. Table is now available.');
+      // Initiate Lipana STK Push
+      const response = await lipana.initiateStkPush({
+        phone: phone,
+        amount: amount,
+        accountReference: `GUEST-${guestId}`,
+        transactionDesc: `Payment for ${paymentModal.guestName}`,
+      });
+
+      if (response.success) {
+        const transactionId = response.data.transactionId;
+
+        // IMPORTANT: Update guest FIRST so webhook can find the guest by transaction_id
+        const { error: guestError } = await supabase.from('guests').update({ 
+          status: 'pending_payment',
+          transaction_id: transactionId 
+        }).eq('id', guestId);
+
+        if (guestError) {
+          throw guestError;
         }
-      }
+
+        // Then record payment intent
+        const { error: paymentError } = await supabase.from('payments').upsert({
+          guest_id: guestId,
+          transaction_id: transactionId,
+          amount,
+          phone_number: phone,
+          status: 'pending',
+          checkout_request_id: response.data.checkoutRequestID,
+          lipana_response: response,
+        }, { onConflict: 'transaction_id' });
+
+        if (paymentError) {
+          throw paymentError;
+        }
+
+        Alert.alert(
+          'Payment Initiated',
+          'Please check your phone and enter your M-Pesa PIN to complete payment.',
+          [{ text: 'OK' }]
+        );
       
-      refetch();
+        setPaymentModal({ open: false });
+      
+        // Note: Guest status will be updated to 'paid' via webhook when payment completes
+      } else {
+        throw new Error(response.message || 'Payment initiation failed');
+      }
     } catch (err) {
-      console.error('Payment failed', err);
-      Alert.alert('Error', 'Payment failed. Please try again.');
+      console.error('Payment initiation failed:', err);
+      Alert.alert('Error', err instanceof Error ? err.message : 'Payment initiation failed. Please try again.');
+    } finally {
+      setProcessingPayment(false);
     }
   }
 
@@ -458,7 +492,8 @@ export default function TablesScreen() {
           subtitle={`Guest: ${paymentModal.guestName}`}
           onClose={() => setPaymentModal({ open: false })}
           onConfirm={handleConfirmPayment}
-          confirmLabel="Mark as Paid"
+            confirmLabel={processingPayment ? "Processing..." : "Send Payment Request"}
+            confirmDisabled={processingPayment}
           scrollable={false}
         >
           <View style={styles.paymentInfo}>
@@ -468,9 +503,28 @@ export default function TablesScreen() {
             </Text>
           </View>
 
-          <Text style={styles.paymentNote}>
-            M-Pesa STK Push will be implemented here
-          </Text>
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>M-Pesa Phone Number</Text>
+              <TextInput
+                style={styles.input}
+                value={paymentModal.phone}
+                onChangeText={(text) => setPaymentModal({ ...paymentModal, phone: text })}
+                placeholder="0712345678 or +254712345678"
+                keyboardType="phone-pad"
+                autoComplete="tel"
+                editable={!processingPayment}
+              />
+              <Text style={styles.inputHint}>
+                Enter the customer's M-Pesa phone number
+              </Text>
+            </View>
+
+            <View style={styles.paymentNote}>
+              <Ionicons name="information-circle" size={16} color="#6366f1" />
+              <Text style={styles.paymentNoteText}>
+                Customer will receive an M-Pesa prompt on their phone to complete payment
+              </Text>
+            </View>
         </ModalBox>
       )}
     </Screen>
@@ -778,12 +832,28 @@ const styles = StyleSheet.create({
     color: '#10b981',
   },
   paymentNote: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#eef2ff',
+    padding: 14,
+    borderRadius: 10,
+    marginTop: 16,
+    borderWidth: 1,
+    borderColor: '#c7d2fe',
+  },
+  paymentNoteText: {
+    flex: 1,
     fontSize: 13,
-    color: '#64748b',
-    textAlign: 'center',
-    marginBottom: 22,
-    fontStyle: 'italic',
+    color: '#4338ca',
+    lineHeight: 18,
     fontWeight: '500',
+  },
+  inputHint: {
+    fontSize: 12,
+    color: '#64748b',
+    marginTop: 6,
+    fontStyle: 'italic',
   },
   
   // Modal actions
