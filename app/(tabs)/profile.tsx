@@ -1,6 +1,6 @@
 import { useAuth } from '@/context/AuthContext';
-import { supabase } from '@/lib/supabase';
 import { lipana } from '@/lib/lipana';
+import { supabase } from '@/lib/supabase';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 // removed useRouter (users moved to bottom tabs)

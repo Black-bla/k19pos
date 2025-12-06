@@ -3,8 +3,8 @@ import { supabase } from '@/lib/supabase';
 import { Ionicons } from '@expo/vector-icons';
 import React, { useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
     Alert,
+    Animated,
     FlatList,
     Pressable,
     RefreshControl,
@@ -38,6 +38,44 @@ export default function KitchenScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedFilter, setSelectedFilter] = useState<OrderStatus | 'all'>('all');
+  const scaleAnimation = React.useRef(new Animated.Value(1)).current;
+  const rotateAnimation = React.useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    // Start animations when loading
+    const scaleAnim = Animated.loop(
+      Animated.sequence([
+        Animated.timing(scaleAnimation, {
+          toValue: 1.2,
+          duration: 500,
+          useNativeDriver: true,
+        }),
+        Animated.timing(scaleAnimation, {
+          toValue: 1,
+          duration: 500,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+
+    const rotateAnim = Animated.loop(
+      Animated.timing(rotateAnimation, {
+        toValue: 1,
+        duration: 2000,
+        useNativeDriver: true,
+      })
+    );
+
+    if (loading) {
+      scaleAnim.start();
+      rotateAnim.start();
+    }
+
+    return () => {
+      scaleAnim.stop();
+      rotateAnim.stop();
+    };
+  }, [loading]);
 
   useEffect(() => {
     fetchOrders();
@@ -227,10 +265,27 @@ export default function KitchenScreen() {
   const readyCount = orders.filter((o) => o.status === 'ready').length;
 
   if (loading) {
+    const rotate = rotateAnimation.interpolate({
+      inputRange: [0, 1],
+      outputRange: ['0deg', '360deg'],
+    });
+
     return (
       <Screen style={styles.container}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#0ea5e9" />
+          <Animated.View
+            style={[
+              styles.loadingIconWrapper,
+              {
+                transform: [
+                  { scale: scaleAnimation },
+                  { rotate: rotate },
+                ],
+              },
+            ]}
+          >
+            <Ionicons name="flame" size={80} color="#ef4444" />
+          </Animated.View>
           <Text style={styles.loadingText}>Loading kitchen orders...</Text>
         </View>
       </Screen>
@@ -314,6 +369,9 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  loadingIconWrapper: {
+    marginBottom: 20,
   },
   loadingText: {
     marginTop: 12,
