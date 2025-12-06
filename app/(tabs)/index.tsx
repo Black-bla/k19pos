@@ -392,6 +392,7 @@ export default function TablesScreen() {
                 table={item}
                 occupancy={occupancy}
                 emptySeats={emptySeats}
+                seatCount={item.seat_count}
                 waiterName={waiter?.name}
                 onPress={() => handleTablePress(item.id, item.status)}
                 onEdit={() => {
@@ -465,24 +466,26 @@ export default function TablesScreen() {
                 {showTableWaiterDropdown && (
                   <View style={styles.dropdownList}>
                     <ScrollView style={styles.dropdownScroll}>
-                      {waiters.map(waiter => (
-                        <Pressable
-                          key={waiter.id}
-                          style={[
-                            styles.dropdownItem,
-                            newTableWaiter === waiter.id && styles.dropdownItemSelected
-                          ]}
-                          onPress={() => {
-                            setNewTableWaiter(waiter.id);
-                            setShowTableWaiterDropdown(false);
-                          }}
-                        >
-                          <Text style={styles.dropdownItemText}>{waiter.name}</Text>
-                          {newTableWaiter === waiter.id && (
-                            <Text style={styles.dropdownCheckmark}>✓</Text>
-                          )}
-                        </Pressable>
-                      ))}
+                      {waiters
+                        .filter(waiter => !waiter.id || !tables.some(t => t.waiter_id === waiter.id))
+                        .map(waiter => (
+                          <Pressable
+                            key={waiter.id}
+                            style={[
+                              styles.dropdownItem,
+                              newTableWaiter === waiter.id && styles.dropdownItemSelected
+                            ]}
+                            onPress={() => {
+                              setNewTableWaiter(waiter.id);
+                              setShowTableWaiterDropdown(false);
+                            }}
+                          >
+                            <Text style={styles.dropdownItemText}>{waiter.name}</Text>
+                            {newTableWaiter === waiter.id && (
+                              <Text style={styles.dropdownCheckmark}>✓</Text>
+                            )}
+                          </Pressable>
+                        ))}
                     </ScrollView>
                   </View>
                 )}

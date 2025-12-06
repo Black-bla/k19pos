@@ -3,12 +3,12 @@ import { Table } from '@/lib/types';
 import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
 import { Dimensions, Pressable, StyleSheet, Text, View } from 'react-native';
-import StatusBadge from './StatusBadge';
 
 interface Props {
   table: Table;
   occupancy?: number;
   emptySeats?: number;
+  seatCount?: number;
   waiterName?: string;
   onPress: () => void;
   onEdit?: () => void;
@@ -19,6 +19,7 @@ export default function TableCard({
   table, 
   occupancy = 0, 
   emptySeats = 0,
+  seatCount = 4,
   waiterName,
   onPress,
   onEdit,
@@ -26,27 +27,95 @@ export default function TableCard({
 }: Props) {
   const [showMenu, setShowMenu] = useState(false);
 
+  // Determine card background color based on occupancy
+  const getCardBackground = () => {
+    if (occupancy === 0) return '#eff6ff'; // Light blue - empty
+    if (occupancy === seatCount) return '#fef3c7'; // Light orange - full
+    return '#f0fdf4'; // Light green - partial
+  };
+
+  // Get status icon and color
+  const getStatusIndicator = () => {
+    if (table.status === 'occupied') {
+      return { icon: 'checkmark-circle', color: '#10b981' };
+    }
+    return { icon: 'circle', color: '#0ea5e9' };
+  };
+
+  const statusIndicator = getStatusIndicator();
+
+  // Get waiter initials for avatar
+  const getWaiterInitials = () => {
+    if (!waiterName) return '';
+    return waiterName
+      .split(' ')
+      .map((n) => n[0])
+      .join('')
+      .toUpperCase()
+      .slice(0, 2);
+  };
+
+  const waiterInitials = getWaiterInitials();
+
   return (
     <Pressable
-      style={[styles.card, { borderColor: StatusColors[table.status] }]}
+      style={[
+        styles.card,
+        { backgroundColor: getCardBackground(), borderColor: StatusColors[table.status] },
+      ]}
       onPress={onPress}
       android_ripple={{ color: '#e5e7eb' }}
     >
-      {/* Header with menu */}
-      <View style={styles.header}>
+      {/* Top Section: Table Name | Capacity Badge */}
+      <View style={styles.topSection}>
         <Text style={styles.name}>{table.name}</Text>
+        <View style={styles.capacityBadge}>
+          <Text style={styles.capacityText}>{seatCount}</Text>
+          <Ionicons name="people" size={12} color="#64748b" />
+        </View>
+      </View>
+
+      {/* Status Icon Overlay */}
+      <View style={styles.statusOverlay}>
+        <Ionicons name={statusIndicator.icon} size={24} color={statusIndicator.color} />
+      </View>
+
+      {/* Center Section: Seat Visualization */}
+      <View style={styles.seatVisualization}>
+        {Array.from({ length: seatCount }).map((_, i) => (
+          <View
+            key={i}
+            style={[
+              styles.seatDot,
+              { backgroundColor: i < occupancy ? '#10b981' : '#e2e8f0' },
+            ]}
+          />
+        ))}
+      </View>
+
+      {/* Bottom Section: Waiter | Menu */}
+      <View style={styles.bottomSection}>
+        {waiterName && (
+          <View style={styles.waiterInfo}>
+            <View style={styles.waiterAvatar}>
+              <Text style={styles.waiterInitials}>{waiterInitials}</Text>
+            </View>
+            <Text style={styles.waiterText}>{waiterName}</Text>
+          </View>
+        )}
+        
         <View style={styles.menuContainer}>
-          <Pressable 
+          <Pressable
             style={styles.menuBtn}
             onPress={() => setShowMenu(!showMenu)}
           >
-            <Ionicons name="ellipsis-vertical" size={20} color="#64748b" />
+            <Ionicons name="ellipsis-vertical" size={18} color="#64748b" />
           </Pressable>
-          
+
           {showMenu && (
             <View style={styles.dropdown}>
               {onEdit && (
-                <Pressable 
+                <Pressable
                   style={styles.menuItem}
                   onPress={() => {
                     onEdit();
@@ -54,11 +123,11 @@ export default function TableCard({
                   }}
                 >
                   <Ionicons name="pencil" size={16} color="#0ea5e9" />
-                  <Text style={styles.menuItemText}>Edit Table</Text>
+                  <Text style={styles.menuItemText}>Edit</Text>
                 </Pressable>
               )}
               {onRemove && (
-                <Pressable 
+                <Pressable
                   style={[styles.menuItem, styles.menuItemDanger]}
                   onPress={() => {
                     onRemove();
@@ -66,40 +135,13 @@ export default function TableCard({
                   }}
                 >
                   <Ionicons name="trash" size={16} color="#ef4444" />
-                  <Text style={styles.menuItemDangerText}>Remove Table</Text>
+                  <Text style={styles.menuItemDangerText}>Remove</Text>
                 </Pressable>
               )}
             </View>
           )}
         </View>
       </View>
-
-      {/* Status Badge */}
-      <StatusBadge status={table.status} />
-
-      {/* Occupancy Info */}
-      <View style={styles.infoSection}>
-        <View style={styles.infoRow}>
-          <Ionicons name="people" size={16} color="#10b981" />
-          <Text style={styles.infoText}>
-            <Text style={styles.infoBold}>{occupancy}</Text> occupied
-          </Text>
-        </View>
-        <View style={styles.infoRow}>
-          <Ionicons name="square" size={16} color="#0ea5e9" />
-          <Text style={styles.infoText}>
-            <Text style={styles.infoBold}>{emptySeats}</Text> empty
-          </Text>
-        </View>
-      </View>
-
-      {/* Waiter Info */}
-      {waiterName && (
-        <View style={styles.waiterSection}>
-          <Ionicons name="person-circle" size={14} color="#8b5cf6" />
-          <Text style={styles.waiterText}>{waiterName}</Text>
-        </View>
-      )}
     </Pressable>
   );
 }
@@ -111,25 +153,92 @@ const cardWidth = (screenWidth - 48) / 2; // 24px padding (12 each side) + 12px 
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: '#fff',
-    padding: 14,
-    borderRadius: 12,
-    borderWidth: 2,
-    gap: 10,
     width: cardWidth,
     height: cardWidth,
+    borderRadius: 14,
+    borderWidth: 2,
+    padding: 12,
     justifyContent: 'space-between',
     position: 'relative',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 3,
   },
-  header: {
+  topSection: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    alignItems: 'center',
+    marginBottom: 2,
   },
   name: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '700',
-    color: '#111827',
+    color: '#0f172a',
+    flex: 1,
+  },
+  capacityBadge: {
+    backgroundColor: '#f1f5f9',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  capacityText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#0f172a',
+  },
+  statusOverlay: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    opacity: 0.9,
+  },
+  seatVisualization: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 6,
+    flex: 1,
+  },
+  seatDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+  },
+  bottomSection: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  waiterInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flex: 1,
+  },
+  waiterAvatar: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#8b5cf6',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  waiterInitials: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  waiterText: {
+    fontSize: 11,
+    color: '#64748b',
+    fontWeight: '600',
     flex: 1,
   },
   menuContainer: {
@@ -138,7 +247,7 @@ const styles = StyleSheet.create({
   menuBtn: {
     padding: 6,
     borderRadius: 6,
-    backgroundColor: '#f8fafc',
+    backgroundColor: 'rgba(241, 245, 249, 0.7)',
   },
   dropdown: {
     position: 'absolute',
@@ -149,10 +258,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#e2e8f0',
     overflow: 'hidden',
-    minWidth: 150,
+    minWidth: 140,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.15,
     shadowRadius: 8,
     elevation: 5,
     zIndex: 10,
@@ -160,8 +269,8 @@ const styles = StyleSheet.create({
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 14,
-    paddingVertical: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
     gap: 8,
     borderBottomWidth: 1,
     borderBottomColor: '#f1f5f9',
@@ -178,35 +287,5 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     color: '#ef4444',
-  },
-  infoSection: {
-    gap: 8,
-  },
-  infoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  infoText: {
-    fontSize: 13,
-    color: '#64748b',
-    fontWeight: '500',
-  },
-  infoBold: {
-    fontWeight: '700',
-    color: '#1e293b',
-  },
-  waiterSection: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: '#f1f5f9',
-  },
-  waiterText: {
-    fontSize: 12,
-    color: '#8b5cf6',
-    fontWeight: '600',
   },
 });
