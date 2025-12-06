@@ -102,33 +102,37 @@ export default function TablesScreen() {
   }
 
   function handleRemoveTable(id: string, tableName: string) {
+    // Get active guests for this table (already filtered by useTables hook)
+    const guests = guestsByTable[id] || [];
+    
+    if (guests.length > 0) {
+      Alert.alert(
+        'Cannot Remove',
+        `This table has ${guests.length} active guest(s). Please clear all guests before removing the table.`,
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+
     Alert.alert(
-      'Remove Table', 
-      `Are you sure you want to remove ${tableName}?`, 
+      'Remove Table',
+      `Are you sure you want to remove ${tableName}? This action cannot be undone.`,
       [
         { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Remove', 
-          style: 'destructive', 
+        {
+          text: 'Remove',
+          style: 'destructive',
           onPress: async () => {
             try {
-              // Check if table has active guests
-              const guests = guestsByTable[id] || [];
-              const activeGuests = guests.filter(g => g.status !== 'paid');
-              
-              if (activeGuests.length > 0) {
-                Alert.alert('Cannot Remove', 'This table has active guests. Please clear all guests first.');
-                return;
-              }
-              
               await supabase.from('tables').delete().eq('id', id);
               refetch();
+              Alert.alert('Success', `${tableName} has been removed.`);
             } catch (err) {
               console.error('Remove failed', err);
-              Alert.alert('Error', 'Failed to remove table');
+              Alert.alert('Error', 'Failed to remove table. Please try again.');
             }
-          }
-        }
+          },
+        },
       ]
     );
   }

@@ -45,7 +45,10 @@ export function useTables() {
     if (data) {
       data.forEach((g: Guest) => {
         if (!map[g.table_id]) map[g.table_id] = [];
-        map[g.table_id].push(g);
+        // Only include active guests (not paid) in occupancy count
+        if (g.status !== 'paid') {
+          map[g.table_id].push(g);
+        }
       });
     }
     setGuestsByTable(map);
