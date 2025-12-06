@@ -300,6 +300,21 @@ export default function KitchenScreen() {
   }
 
   function renderOrderCard({ item }: { item: GroupedOrder }) {
+    // Group items by category within this guest's order
+    const itemsByCategory: { [key: string]: KitchenOrder[] } = {};
+    
+    item.items.forEach((order) => {
+      const category = order.category || 'OTHER';
+      if (!itemsByCategory[category]) {
+        itemsByCategory[category] = [];
+      }
+      itemsByCategory[category].push(order);
+    });
+
+    // Define course order
+    const courseOrder = ['STARTER', 'MAIN_MEAL', 'DESSERT', 'DRINKS'];
+    const sortedCategories = courseOrder.filter((cat) => itemsByCategory[cat]);
+
     const hasReadyItems = item.items.some((i) => i.status === 'ready');
     const hasPendingItems = item.items.some((i) => i.status === 'pending');
 
@@ -313,47 +328,60 @@ export default function KitchenScreen() {
           </View>
         </View>
 
-        {/* Course Items */}
+        {/* Grouped Course Items */}
         <View style={styles.coursesContainer}>
-          {item.items.map((courseItem) => (
-            <View key={courseItem.id} style={styles.courseItem}>
-              <View style={styles.courseHeader}>
-                <View style={styles.courseInfo}>
+          {sortedCategories.map((category) => {
+            const categoryItems = itemsByCategory[category];
+            const courseStatus = categoryItems[0]?.status || 'pending';
+
+            return (
+              <View key={category} style={styles.courseItem}>
+                {/* Course Header */}
+                <View style={styles.courseHeader}>
+                  <View style={styles.courseInfo}>
+                    <View
+                      style={[
+                        styles.courseBadge,
+                        { backgroundColor: getCourseColor(category) },
+                      ]}
+                    >
+                      <Ionicons
+                        name={getCourseIcon(category)}
+                        size={14}
+                        color="#fff"
+                      />
+                    </View>
+                    <View style={styles.courseDetails}>
+                      <Text style={styles.courseName}>{getCourseName(category)}</Text>
+                    </View>
+                  </View>
                   <View
                     style={[
-                      styles.courseBadge,
-                      { backgroundColor: getCourseColor(courseItem.category) },
+                      styles.statusDot,
+                      {
+                        backgroundColor:
+                          courseStatus === 'ready'
+                            ? '#10b981'
+                            : courseStatus === 'preparing'
+                              ? '#f59e0b'
+                              : '#ef4444',
+                      },
                     ]}
-                  >
-                    <Ionicons
-                      name={getCourseIcon(courseItem.category)}
-                      size={14}
-                      color="#fff"
-                    />
-                  </View>
-                  <View style={styles.courseDetails}>
-                    <Text style={styles.courseName}>{getCourseName(courseItem.category)}</Text>
-                    <Text style={styles.itemName}>
-                      {courseItem.quantity}x {courseItem.menu_item_name}
-                    </Text>
-                  </View>
+                  />
                 </View>
-                <View
-                  style={[
-                    styles.statusDot,
-                    {
-                      backgroundColor:
-                        courseItem.status === 'ready'
-                          ? '#10b981'
-                          : courseItem.status === 'preparing'
-                            ? '#f59e0b'
-                            : '#ef4444',
-                    },
-                  ]}
-                />
+
+                {/* Dishes in this course */}
+                <View style={styles.dishesContainer}>
+                  {categoryItems.map((courseItem) => (
+                    <View key={courseItem.id} style={styles.dishItem}>
+                      <Text style={styles.dishQuantity}>{courseItem.quantity}x</Text>
+                      <Text style={styles.dishName}>{courseItem.menu_item_name}</Text>
+                    </View>
+                  ))}
+                </View>
               </View>
-            </View>
-          ))}
+            );
+          })}
         </View>
 
         {/* Action Buttons */}
@@ -626,6 +654,29 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#0f172a',
     marginBottom: 2,
+  },
+  dishesContainer: {
+    marginTop: 10,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#e2e8f0',
+    gap: 8,
+  },
+  dishItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  dishQuantity: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#0ea5e9',
+    minWidth: 32,
+  },
+  dishName: {
+    fontSize: 12,
+    color: '#475569',
+    flex: 1,
   },
   itemName: {
     fontSize: 12,
