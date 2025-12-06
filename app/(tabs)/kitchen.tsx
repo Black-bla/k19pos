@@ -267,7 +267,7 @@ export default function KitchenScreen() {
               },
             ]}
           >
-            <Ionicons name="flame" size={80} color="#ef4444" />
+            <Ionicons name="flame" size={80} color="#fca5a5" />
           </Animated.View>
           <Text style={styles.loadingText}>Loading kitchen orders...</Text>
         </View>
