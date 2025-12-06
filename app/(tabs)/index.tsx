@@ -343,6 +343,13 @@ export default function TablesScreen() {
           >
             <Ionicons name="refresh" size={20} color="#0ea5e9" />
           </Pressable>
+          <Pressable 
+            style={styles.paymentsBtn} 
+            onPress={() => router.push('/payments')}
+          >
+            <Ionicons name="card" size={20} color="#fff" />
+            <Text style={styles.paymentsBtnText}>Payments</Text>
+          </Pressable>
           <Pressable style={styles.addHeaderBtn} onPress={() => setAddModalOpen(true)}>
             <Text style={styles.addHeaderBtnText}>+ Add Table</Text>
           </Pressable>
@@ -598,6 +605,25 @@ const styles = StyleSheet.create({
   addHeaderBtnText: {
     color: '#fff',
     fontSize: 15,
+    fontWeight: '700',
+  },
+  paymentsBtn: {
+    backgroundColor: '#0ea5e9',
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    borderRadius: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    shadowColor: '#0ea5e9',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  paymentsBtnText: {
+    color: '#fff',
+    fontSize: 14,
     fontWeight: '700',
   },
   grid: {
