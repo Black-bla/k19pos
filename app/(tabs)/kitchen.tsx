@@ -23,6 +23,7 @@ interface KitchenOrder {
   quantity: number;
   price_snapshot: number;
   status: OrderStatus;
+  category?: string;
   guest?: {
     guest_name: string;
     seat_number: number;
@@ -31,6 +32,15 @@ interface KitchenOrder {
       name: string;
     };
   };
+}
+
+interface GroupedOrder {
+  guest_id: string;
+  guest_name: string;
+  table_name: string;
+  seat_number: number;
+  waiter_id?: string;
+  items: KitchenOrder[];
 }
 
 export default function KitchenScreen() {
@@ -102,16 +112,20 @@ export default function KitchenScreen() {
             tables:table_id (
               name
             )
+          ),
+          menu_items:menu_item_id (
+            category
           )
         `)
         .neq('status', 'served');
 
       if (error) throw error;
 
-      // Transform the data to handle the nested structure
+      // Transform and group the data by guest_id
       const transformedData = (data || []).map((order: any) => ({
         ...order,
         guest: Array.isArray(order.guests) ? order.guests[0] : order.guests,
+        category: Array.isArray(order.menu_items) ? order.menu_items[0]?.category : order.menu_items?.category,
       }));
 
       setOrders(transformedData);
@@ -200,50 +214,171 @@ export default function KitchenScreen() {
     }
   }
 
-  function getFilteredOrders() {
-    if (selectedFilter === 'all') return orders;
-    return orders.filter((order) => order.status === selectedFilter);
+  function getFilteredOrders(): GroupedOrder[] {
+    // Group orders by guest_id
+    const grouped: { [key: string]: KitchenOrder[] } = {};
+    
+    orders.forEach((order) => {
+      if (!grouped[order.guest_id]) {
+        grouped[order.guest_id] = [];
+      }
+      grouped[order.guest_id].push(order);
+    });
+
+    // Convert to array of GroupedOrder
+    const groupedArray: GroupedOrder[] = Object.entries(grouped).map(([guestId, items]) => {
+      const firstItem = items[0];
+      return {
+        guest_id: guestId,
+        guest_name: firstItem.guest?.guest_name || 'Unknown Guest',
+        table_name: firstItem.guest?.tables?.name || 'Unknown Table',
+        seat_number: firstItem.guest?.seat_number || 0,
+        items,
+      };
+    });
+
+    // Apply filter
+    if (selectedFilter === 'all') return groupedArray;
+    return groupedArray.filter((order) => order.items.some((item) => item.status === selectedFilter));
   }
 
-  function renderOrderCard({ item }: { item: KitchenOrder }) {
-    const statusColor = getStatusColor(item.status);
-    const statusIcon = getStatusIcon(item.status);
-    const nextStatus = getNextStatus(item.status);
-    const nextLabel = getNextStatusLabel(item.status);
-    const tableName = item.guest?.tables?.name || 'Unknown Table';
+  function getCourseColor(category: string | undefined) {
+    switch (category) {
+      case 'STARTER':
+        return '#f59e0b';
+      case 'MAIN_MEAL':
+        return '#ef4444';
+      case 'DESSERT':
+        return '#a855f7';
+      case 'DRINKS':
+        return '#3b82f6';
+      default:
+        return '#94a3b8';
+    }
+  }
+
+  function getCourseIcon(category: string | undefined) {
+    switch (category) {
+      case 'STARTER':
+        return 'leaf-outline';
+      case 'MAIN_MEAL':
+        return 'pizza-outline';
+      case 'DESSERT':
+        return 'ice-cream-outline';
+      case 'DRINKS':
+        return 'beer-outline';
+      default:
+        return 'restaurant-outline';
+    }
+  }
+
+  function getCourseName(category: string | undefined) {
+    switch (category) {
+      case 'STARTER':
+        return 'Starter';
+      case 'MAIN_MEAL':
+        return 'Main';
+      case 'DESSERT':
+        return 'Dessert';
+      case 'DRINKS':
+        return 'Drink';
+      default:
+        return 'Item';
+    }
+  }
+
+  function renderOrderCard({ item }: { item: GroupedOrder }) {
+    const hasReadyItems = item.items.some((i) => i.status === 'ready');
+    const hasPendingItems = item.items.some((i) => i.status === 'pending');
 
     return (
-      <View style={[styles.orderCard, { borderLeftColor: statusColor }]}>
+      <View style={styles.orderCard}>
+        {/* Header */}
         <View style={styles.orderHeader}>
           <View style={styles.tableInfo}>
-            <Text style={styles.tableName}>{tableName}</Text>
-            <Text style={styles.seatNumber}>Seat {item.guest?.seat_number || '?'}</Text>
-          </View>
-          <View style={[styles.statusBadge, { backgroundColor: statusColor }]}>
-            <Ionicons name={statusIcon} size={16} color="#fff" />
-            <Text style={styles.statusText}>{item.status.toUpperCase()}</Text>
+            <Text style={styles.tableName}>{item.table_name}</Text>
+            <Text style={styles.seatNumber}>Seat {item.seat_number} • {item.guest_name}</Text>
           </View>
         </View>
 
-        <View style={styles.orderBody}>
-          <Text style={styles.guestName}>{item.guest?.guest_name || 'Unknown Guest'}</Text>
-          <View style={styles.itemRow}>
-            <Text style={styles.itemQuantity}>{item.quantity}x</Text>
-            <Text style={styles.itemName}>{item.menu_item_name}</Text>
-          </View>
+        {/* Course Items */}
+        <View style={styles.coursesContainer}>
+          {item.items.map((courseItem) => (
+            <View key={courseItem.id} style={styles.courseItem}>
+              <View style={styles.courseHeader}>
+                <View style={styles.courseInfo}>
+                  <View
+                    style={[
+                      styles.courseBadge,
+                      { backgroundColor: getCourseColor(courseItem.category) },
+                    ]}
+                  >
+                    <Ionicons
+                      name={getCourseIcon(courseItem.category)}
+                      size={14}
+                      color="#fff"
+                    />
+                  </View>
+                  <View style={styles.courseDetails}>
+                    <Text style={styles.courseName}>{getCourseName(courseItem.category)}</Text>
+                    <Text style={styles.itemName}>
+                      {courseItem.quantity}x {courseItem.menu_item_name}
+                    </Text>
+                  </View>
+                </View>
+                <View
+                  style={[
+                    styles.statusDot,
+                    {
+                      backgroundColor:
+                        courseItem.status === 'ready'
+                          ? '#10b981'
+                          : courseItem.status === 'preparing'
+                            ? '#f59e0b'
+                            : '#ef4444',
+                    },
+                  ]}
+                />
+              </View>
+            </View>
+          ))}
         </View>
 
-        {nextStatus && (
-          <View style={styles.orderFooter}>
+        {/* Action Buttons */}
+        <View style={styles.orderFooter}>
+          {hasPendingItems && (
             <Pressable
-              style={[styles.actionButton, { backgroundColor: getStatusColor(nextStatus) }]}
-              onPress={() => handleUpdateStatus(item.id, nextStatus)}
+              style={[styles.courseActionButton, { backgroundColor: '#f59e0b' }]}
+              onPress={() => {
+                // Mark all pending items as preparing
+                item.items.forEach((courseItem) => {
+                  if (courseItem.status === 'pending') {
+                    handleUpdateStatus(courseItem.id, 'preparing');
+                  }
+                });
+              }}
             >
-              <Ionicons name="arrow-forward" size={18} color="#fff" />
-              <Text style={styles.actionButtonText}>{nextLabel}</Text>
+              <Ionicons name="flame-outline" size={16} color="#fff" />
+              <Text style={styles.courseActionText}>Start Preparing</Text>
             </Pressable>
-          </View>
-        )}
+          )}
+          {hasReadyItems && (
+            <Pressable
+              style={[styles.courseActionButton, { backgroundColor: '#10b981' }]}
+              onPress={() => {
+                // Mark all ready items as served
+                item.items.forEach((courseItem) => {
+                  if (courseItem.status === 'ready') {
+                    handleUpdateStatus(courseItem.id, 'served');
+                  }
+                });
+              }}
+            >
+              <Ionicons name="checkmark-circle-outline" size={16} color="#fff" />
+              <Text style={styles.courseActionText}>Serve Ready Items</Text>
+            </Pressable>
+          )}
+        </View>
       </View>
     );
   }
@@ -333,7 +468,7 @@ export default function KitchenScreen() {
       ) : (
         <FlatList
           data={filteredOrders}
-          keyExtractor={(item) => item.id}
+          keyExtractor={(item) => item.guest_id}
           renderItem={renderOrderCard}
           contentContainerStyle={styles.listContent}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
@@ -417,7 +552,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 14,
     marginBottom: 12,
-    borderLeftWidth: 4,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
@@ -425,10 +559,10 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   orderHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 14,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
   },
   tableInfo: {
     flex: 1,
@@ -443,6 +577,70 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#64748b',
   },
+  coursesContainer: {
+    gap: 10,
+    marginBottom: 12,
+  },
+  courseItem: {
+    backgroundColor: '#f8fafc',
+    borderRadius: 10,
+    padding: 12,
+    borderLeftWidth: 3,
+    borderLeftColor: '#e2e8f0',
+  },
+  courseHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  courseInfo: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  courseBadge: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  courseDetails: {
+    flex: 1,
+  },
+  courseName: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#0f172a',
+    marginBottom: 2,
+  },
+  itemName: {
+    fontSize: 12,
+    color: '#64748b',
+  },
+  statusDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+  },
+  orderFooter: {
+    gap: 8,
+  },
+  courseActionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    gap: 6,
+  },
+  courseActionText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#fff',
+  },
   statusBadge: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -456,14 +654,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#fff',
   },
-  orderBody: {
-    marginBottom: 12,
-  },
-  guestName: {
-    fontSize: 13,
-    color: '#64748b',
-    marginBottom: 8,
-  },
   itemRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -474,17 +664,6 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: '#0ea5e9',
     minWidth: 40,
-  },
-  itemName: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#0f172a',
-    flex: 1,
-  },
-  orderFooter: {
-    borderTopWidth: 1,
-    borderTopColor: '#f1f5f9',
-    paddingTop: 12,
   },
   actionButton: {
     flexDirection: 'row',
