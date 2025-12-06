@@ -315,8 +315,31 @@ export default function KitchenScreen() {
     const courseOrder = ['STARTER', 'MAIN_MEAL', 'DESSERT', 'DRINKS'];
     const sortedCategories = courseOrder.filter((cat) => itemsByCategory[cat]);
 
-    const hasReadyItems = item.items.some((i) => i.status === 'ready');
-    const hasPendingItems = item.items.some((i) => i.status === 'pending');
+    const getNextStatus = (current: OrderStatus): OrderStatus | null => {
+      switch (current) {
+        case 'pending':
+          return 'preparing';
+        case 'preparing':
+          return 'ready';
+        case 'ready':
+          return 'served';
+        default:
+          return null;
+      }
+    };
+
+    const handleCoursePress = (category: string) => {
+      const categoryItems = itemsByCategory[category];
+      const courseStatus = categoryItems[0]?.status || 'pending';
+      const nextStatus = getNextStatus(courseStatus);
+
+      if (nextStatus) {
+        // Update all items in this course to the next status
+        categoryItems.forEach((item) => {
+          handleUpdateStatus(item.id, nextStatus);
+        });
+      }
+    };
 
     return (
       <View style={styles.orderCard}>
@@ -333,91 +356,70 @@ export default function KitchenScreen() {
           {sortedCategories.map((category) => {
             const categoryItems = itemsByCategory[category];
             const courseStatus = categoryItems[0]?.status || 'pending';
+            const nextStatus = getNextStatus(courseStatus);
+            const canAdvance = nextStatus !== null;
 
             return (
-              <View key={category} style={styles.courseItem}>
-                {/* Course Header */}
-                <View style={styles.courseHeader}>
-                  <View style={styles.courseInfo}>
+              <Pressable
+                key={category}
+                onPress={() => handleCoursePress(category)}
+                disabled={!canAdvance}
+              >
+                <View style={[styles.courseItem, !canAdvance && styles.courseItemDisabled]}>
+                  {/* Course Header */}
+                  <View style={styles.courseHeader}>
+                    <View style={styles.courseInfo}>
+                      <View
+                        style={[
+                          styles.courseBadge,
+                          { backgroundColor: getCourseColor(category) },
+                        ]}
+                      >
+                        <Ionicons
+                          name={getCourseIcon(category)}
+                          size={14}
+                          color="#fff"
+                        />
+                      </View>
+                      <View style={styles.courseDetails}>
+                        <Text style={styles.courseName}>{getCourseName(category)}</Text>
+                        <Text style={styles.courseStatus}>
+                          {courseStatus === 'pending'
+                            ? 'Tap to start'
+                            : courseStatus === 'preparing'
+                              ? 'Tap when ready'
+                              : 'Ready to serve'}
+                        </Text>
+                      </View>
+                    </View>
                     <View
                       style={[
-                        styles.courseBadge,
-                        { backgroundColor: getCourseColor(category) },
+                        styles.statusDot,
+                        {
+                          backgroundColor:
+                            courseStatus === 'ready'
+                              ? '#10b981'
+                              : courseStatus === 'preparing'
+                                ? '#f59e0b'
+                                : '#ef4444',
+                        },
                       ]}
-                    >
-                      <Ionicons
-                        name={getCourseIcon(category)}
-                        size={14}
-                        color="#fff"
-                      />
-                    </View>
-                    <View style={styles.courseDetails}>
-                      <Text style={styles.courseName}>{getCourseName(category)}</Text>
-                    </View>
+                    />
                   </View>
-                  <View
-                    style={[
-                      styles.statusDot,
-                      {
-                        backgroundColor:
-                          courseStatus === 'ready'
-                            ? '#10b981'
-                            : courseStatus === 'preparing'
-                              ? '#f59e0b'
-                              : '#ef4444',
-                      },
-                    ]}
-                  />
-                </View>
 
-                {/* Dishes in this course */}
-                <View style={styles.dishesContainer}>
-                  {categoryItems.map((courseItem) => (
-                    <View key={courseItem.id} style={styles.dishItem}>
-                      <Text style={styles.dishQuantity}>{courseItem.quantity}x</Text>
-                      <Text style={styles.dishName}>{courseItem.menu_item_name}</Text>
-                    </View>
-                  ))}
+                  {/* Dishes in this course */}
+                  <View style={styles.dishesContainer}>
+                    {categoryItems.map((courseItem) => (
+                      <View key={courseItem.id} style={styles.dishItem}>
+                        <Text style={styles.dishQuantity}>{courseItem.quantity}x</Text>
+                        <Text style={styles.dishName}>{courseItem.menu_item_name}</Text>
+                      </View>
+                    ))}
+                  </View>
                 </View>
-              </View>
+              </Pressable>
             );
           })}
-        </View>
-
-        {/* Action Buttons */}
-        <View style={styles.orderFooter}>
-          {hasPendingItems && (
-            <Pressable
-              style={[styles.courseActionButton, { backgroundColor: '#f59e0b' }]}
-              onPress={() => {
-                // Mark all pending items as preparing
-                item.items.forEach((courseItem) => {
-                  if (courseItem.status === 'pending') {
-                    handleUpdateStatus(courseItem.id, 'preparing');
-                  }
-                });
-              }}
-            >
-              <Ionicons name="flame-outline" size={16} color="#fff" />
-              <Text style={styles.courseActionText}>Start Preparing</Text>
-            </Pressable>
-          )}
-          {hasReadyItems && (
-            <Pressable
-              style={[styles.courseActionButton, { backgroundColor: '#10b981' }]}
-              onPress={() => {
-                // Mark all ready items as served
-                item.items.forEach((courseItem) => {
-                  if (courseItem.status === 'ready') {
-                    handleUpdateStatus(courseItem.id, 'served');
-                  }
-                });
-              }}
-            >
-              <Ionicons name="checkmark-circle-outline" size={16} color="#fff" />
-              <Text style={styles.courseActionText}>Serve Ready Items</Text>
-            </Pressable>
-          )}
         </View>
       </View>
     );
@@ -654,6 +656,14 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#0f172a',
     marginBottom: 2,
+  },
+  courseStatus: {
+    fontSize: 11,
+    color: '#64748b',
+    fontStyle: 'italic',
+  },
+  courseItemDisabled: {
+    opacity: 0.6,
   },
   dishesContainer: {
     marginTop: 10,
