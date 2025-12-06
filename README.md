@@ -1,6 +1,27 @@
 # K19 POS - Restaurant Point of Sale System 🍽️
 
-A modern, **local-first** point-of-sale system built with React Native (Expo) and Supabase, designed for restaurants with table management, menu control, reservations, and order tracking.
+A modern, **local-first** point-of-sale system built with React Native (Expo) and Supabase, designed for restaurants with table management, menu control, reservations, order tracking, and **M-Pesa payment integration**.
+
+## ⚡ Quick Start
+
+```bash
+# 1. Clone & install
+git clone <repo-url>
+cd k19pos
+npm install
+
+# 2. Set up .env with Supabase and Lipana keys
+cp .env.example .env
+# Edit .env with your credentials
+
+# 3. Start development server
+npx expo start
+
+# 4. Scan QR code with Expo Go on your phone
+# Or: press 'a' for Android / 'i' for iOS emulator
+```
+
+**First-time setup?** See the detailed [Getting Started](#-getting-started) section below.
 
 ## 🌟 Key Features
 
@@ -16,6 +37,14 @@ A modern, **local-first** point-of-sale system built with React Native (Expo) an
 - **Reservations** - Guest booking system with time slots
 - **Order Processing** - Track orders by table with real-time status updates
 - **User Management** - Role-based access control (admin, manager, chef, staff)
+
+### Payment Integration 💳
+- **M-Pesa Payments** - Real-time STK Push payments via Lipana API
+- **Guest-level Payments** - Each guest pays their own bill independently
+- **Automatic Status Tracking** - Guest status updates (pending → pending_payment → paid)
+- **Webhook Processing** - Real-time payment confirmation and webhook callbacks
+- **Table Availability** - Automatic table availability when all guests are paid
+- **Transaction Audit** - Full payment transaction history and audit trail
 
 ### Menu System
 - **Service Date Tracking** - Menus tied to specific dates
@@ -50,8 +79,15 @@ A modern, **local-first** point-of-sale system built with React Native (Expo) an
    
    Create a `.env` file in the root directory:
    ```env
+   # Supabase Configuration
    EXPO_PUBLIC_SUPABASE_URL=your_supabase_url
    EXPO_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+
+   # Lipana Payment Configuration
+   EXPO_PUBLIC_LIPANA_SECRET_KEY=your_lipana_secret_key
+   EXPO_PUBLIC_LIPANA_PUBLISHABLE_KEY=your_lipana_publishable_key
+   EXPO_PUBLIC_LIPANA_WEBHOOK_SECRET=your_webhook_secret
+   EXPO_PUBLIC_LIPANA_ENVIRONMENT=production
    ```
 
 4. **Set up Supabase database**
@@ -134,6 +170,53 @@ A modern, **local-first** point-of-sale system built with React Native (Expo) an
    - Or press `a` for Android emulator
    - Or press `i` for iOS simulator
 
+## 💳 Payment Integration
+
+### Lipana M-Pesa Setup
+
+This system uses [Lipana](https://lipana.dev) for M-Pesa STK Push payments.
+
+**Get your keys:**
+1. Create account at https://dashboard.lipana.dev
+2. Get your **Secret Key** and **Publishable Key**
+3. Configure webhook URL: `https://your-domain.com/lipana-webhook`
+4. Get webhook secret from settings
+
+**Testing:**
+- Use sandbox/test keys for development (no real charges)
+- Switch to production keys for live payments
+- See `PRODUCTION_MODE.md` for testing guide
+
+### Payment Flow
+
+```
+Guest Orders → Table View → Process Payment
+     ↓              ↓              ↓
+Guest selects items → Enter M-Pesa number → STK Push
+                                   ↓
+                        Customer enters PIN
+                                   ↓
+                        Payment processes (real money)
+                                   ↓
+                        Webhook updates status
+                                   ↓
+Guest Status: Paid ✅ → Table: Available ✅
+```
+
+### Guest Payment Status
+
+- **pending** - Guest added, no payment initiated
+- **pending_payment** - Payment initiated, waiting for completion
+- **paid** - Payment successful, guest bill settled
+- **reserved** - Guest has a reservation
+
+### Testing Payments
+
+For development/testing documentation, see:
+- `PRODUCTION_MODE.md` - Complete testing guide with real M-Pesa
+- `PAYMENT_INTEGRATION_STATUS.md` - Integration status and known issues
+- `STK_PUSH_DEBUGGING.md` - Troubleshooting guide
+
 ## 📱 App Structure
 
 ```
@@ -144,20 +227,29 @@ k19pos/
 │   ├── (tabs)/            # Main app tabs
 │   │   ├── index.tsx      # Tables screen
 │   │   ├── menu.tsx       # Menu list screen
-│   │   ├── menu-edit.tsx  # Menu editor
 │   │   ├── reservations.tsx
 │   │   └── _layout.tsx
 │   ├── order/             # Order management
+│   │   └── [id].tsx
 │   └── payment/           # Payment processing
+│       └── [orderId].tsx
 ├── components/            # Reusable components
 ├── context/              # React Context (Auth)
+├── hooks/                # Custom React hooks
 ├── lib/                  # Core libraries
 │   ├── supabase.ts       # Supabase client
+│   ├── lipana.ts         # Lipana payment client
 │   ├── localDb.ts        # SQLite database setup
 │   ├── syncManager.ts    # Offline sync logic
 │   ├── localDataAccess.ts # Local data operations
 │   └── types.ts          # TypeScript types
-└── constants/            # App constants
+├── supabase/
+│   ├── migrations/       # Database migrations
+│   └── functions/        # Edge functions (webhooks)
+│       ├── lipana-webhook/
+│       └── lipana-webhook-test/
+├── constants/            # App constants
+└── README.md             # This file
 ```
 
 ## 🔄 Local-First Sync Architecture
@@ -205,6 +297,7 @@ User Action → Local SQLite → Sync Queue → Background Sync → Supabase
 - **Navigation**: Expo Router (file-based routing)
 - **Database**: Supabase (PostgreSQL) + SQLite (local)
 - **Authentication**: Supabase Auth
+- **Payments**: Lipana M-Pesa STK Push API
 - **Offline Sync**: Custom sync engine with expo-sqlite
 - **Network Detection**: @react-native-community/netinfo
 - **UI**: React Native components with custom styling
@@ -225,10 +318,19 @@ User Action → Local SQLite → Sync Queue → Background Sync → Supabase
 
 ## 🔐 Security Notes
 
+### Payment Security
+- Payment webhook signature verification enabled
+- All transaction data encrypted in transit
+- Row Level Security (RLS) enforced on payments table
+- Transaction IDs stored securely with audit trail
+- Webhook secret kept in server-side environment variables
+
+### General Security
 - Never commit `.env` file to version control
 - Use Row Level Security (RLS) policies in Supabase
 - Implement proper authentication checks
 - Validate user roles on both client and server
+- Keep webhook secrets private (stored in `supabase/functions/.env`)
 
 ## 📝 Development Notes
 
