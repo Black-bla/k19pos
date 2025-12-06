@@ -95,7 +95,9 @@ export default function KitchenScreen() {
   async function fetchOrders() {
     try {
       setLoading(true);
-      const { data, error } = await supabase
+      
+      // Fetch guest orders
+      const { data: ordersData, error: ordersError } = await supabase
         .from('guest_orders')
         .select(`
           id,
@@ -112,20 +114,30 @@ export default function KitchenScreen() {
             tables:table_id (
               name
             )
-          ),
-          menu_items:menu_item_id (
-            category
           )
         `)
         .neq('status', 'served');
 
-      if (error) throw error;
+      if (ordersError) throw ordersError;
 
-      // Transform and group the data by guest_id
-      const transformedData = (data || []).map((order: any) => ({
+      // Fetch all menu items to get categories
+      const { data: menuData, error: menuError } = await supabase
+        .from('menu_items')
+        .select('id, category');
+
+      if (menuError) throw menuError;
+
+      // Create a map of menu_item_id to category
+      const categoryMap = new Map();
+      (menuData || []).forEach((item: any) => {
+        categoryMap.set(item.id, item.category);
+      });
+
+      // Transform and enrich the orders with category
+      const transformedData = (ordersData || []).map((order: any) => ({
         ...order,
         guest: Array.isArray(order.guests) ? order.guests[0] : order.guests,
-        category: Array.isArray(order.menu_items) ? order.menu_items[0]?.category : order.menu_items?.category,
+        category: categoryMap.get(order.menu_item_id),
       }));
 
       setOrders(transformedData);
