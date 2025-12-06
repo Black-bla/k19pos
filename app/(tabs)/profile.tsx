@@ -1,5 +1,6 @@
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
+import { lipana } from '@/lib/lipana';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 // removed useRouter (users moved to bottom tabs)
@@ -16,6 +17,10 @@ export default function ProfileScreen() {
   const [uploading, setUploading] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editedName, setEditedName] = useState(name);
+  const [showPaymentCard, setShowPaymentCard] = useState(false);
+  const [paymentPhone, setPaymentPhone] = useState('');
+  const [paymentAmount, setPaymentAmount] = useState('');
+  const [processingPayment, setProcessingPayment] = useState(false);
 
   function initials(text: string) {
     if (!text) return '';
@@ -120,6 +125,43 @@ export default function ProfileScreen() {
     }
   }
 
+  async function handleSendSTK() {
+    if (!paymentPhone.trim()) {
+      Alert.alert('Error', 'Please enter a phone number');
+      return;
+    }
+    if (!paymentAmount.trim()) {
+      Alert.alert('Error', 'Please enter an amount');
+      return;
+    }
+
+    const amount = parseFloat(paymentAmount);
+    if (isNaN(amount) || amount < 10) {
+      Alert.alert('Error', 'Amount must be at least KES 10');
+      return;
+    }
+
+    try {
+      setProcessingPayment(true);
+      const response = await lipana.initiateStkPush({
+        phone: paymentPhone,
+        amount,
+        accountReference: 'STAFF-PAYMENT',
+        transactionDesc: `Staff Payment - ${name}`,
+      });
+
+      Alert.alert('Success', `STK Push sent to ${paymentPhone}\nTransaction ID: ${response.transactionId}\n\nCheck your phone for the M-Pesa prompt.`);
+      setPaymentPhone('');
+      setPaymentAmount('');
+      setShowPaymentCard(false);
+    } catch (err) {
+      console.error('STK Push error:', err);
+      Alert.alert('Error', 'Failed to send STK Push. Please try again.');
+    } finally {
+      setProcessingPayment(false);
+    }
+  }
+
   return (
     <Screen style={styles.container}>
 
@@ -174,6 +216,77 @@ export default function ProfileScreen() {
           </Pressable>
         </View>
       </View>
+
+      {/* Payment Card */}
+      <View style={styles.card}>
+        <View style={styles.sectionHeader}>
+          <Ionicons name="card" size={24} color="#2563eb" />
+          <Text style={styles.sectionTitle}>Quick Payment</Text>
+        </View>
+
+        {!showPaymentCard ? (
+          <Pressable style={styles.paymentToggleBtn} onPress={() => setShowPaymentCard(true)}>
+            <Ionicons name="add-circle" size={20} color="#fff" />
+            <Text style={styles.btnText}>Send STK Push</Text>
+          </Pressable>
+        ) : (
+          <View style={styles.paymentForm}>
+            <Text style={styles.formLabel}>Phone Number</Text>
+            <TextInput
+              style={styles.formInput}
+              placeholder="254708374149"
+              placeholderTextColor="#cbd5e1"
+              value={paymentPhone}
+              onChangeText={setPaymentPhone}
+              editable={!processingPayment}
+              keyboardType="phone-pad"
+            />
+
+            <Text style={styles.formLabel}>Amount (KES)</Text>
+            <TextInput
+              style={styles.formInput}
+              placeholder="100"
+              placeholderTextColor="#cbd5e1"
+              value={paymentAmount}
+              onChangeText={setPaymentAmount}
+              editable={!processingPayment}
+              keyboardType="decimal-pad"
+            />
+
+            <View style={styles.paymentFormActions}>
+              <Pressable
+                style={[styles.primaryBtn, { flex: 1 }]}
+                onPress={handleSendSTK}
+                disabled={processingPayment}
+              >
+                {processingPayment ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <>
+                    <Ionicons name="send" size={18} color="#fff" />
+                    <Text style={styles.btnText}>Send STK</Text>
+                  </>
+                )}
+              </Pressable>
+              <Pressable
+                style={[styles.dangerBtn, { flex: 1 }]}
+                onPress={() => {
+                  setShowPaymentCard(false);
+                  setPaymentPhone('');
+                  setPaymentAmount('');
+                }}
+                disabled={processingPayment}
+              >
+                <Text style={styles.btnText}>Cancel</Text>
+              </Pressable>
+            </View>
+
+            <Text style={styles.formHint}>
+              Minimum amount: KES 10. You'll receive an M-Pesa prompt on your phone.
+            </Text>
+          </View>
+        )}
+      </View>
     </Screen>
   );
 }
@@ -202,4 +315,54 @@ const styles = StyleSheet.create({
   fullWidth: { width: '100%' },
   rowBtns: { flexDirection: 'row', gap: 12 },
   wideBtn: { minWidth: 140, alignItems: 'center' },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 16,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#111827',
+  },
+  paymentToggleBtn: {
+    backgroundColor: '#2563eb',
+    flexDirection: 'row',
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  paymentForm: {
+    gap: 12,
+  },
+  formLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#374151',
+  },
+  formInput: {
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 14,
+    color: '#111827',
+    backgroundColor: '#f9fafb',
+  },
+  paymentFormActions: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 8,
+  },
+  formHint: {
+    fontSize: 12,
+    color: '#6b7280',
+    fontStyle: 'italic',
+    marginTop: 8,
+    textAlign: 'center',
+  },
 });
