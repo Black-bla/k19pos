@@ -19,9 +19,11 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
+      "bundleIdentifier": "com.blackbla.k19pos",
       "supportsTablet": true
     },
     "android": {
+      "package": "com.blackbla.k19pos",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
