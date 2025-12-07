@@ -1,3 +1,4 @@
+import CustomSplash from '@/components/CustomSplash';
 import ModalBox from '@/components/ModalBox';
 import Screen from '@/components/Screen';
 import OrderManagementScreen from '@/components/screens/OrderManagementScreen';
@@ -23,6 +24,9 @@ export default function TablesScreen() {
   
   // Filter state
   const [showMyTablesOnly, setShowMyTablesOnly] = useState(false);
+  
+  // Custom splash screen state
+  const [showSplash, setShowSplash] = useState(false);
   
   // Add table modal
   const [addModalOpen, setAddModalOpen] = useState(false);
@@ -82,6 +86,7 @@ export default function TablesScreen() {
 
   const handleRefresh = async () => {
     setRefreshing(true);
+    setShowSplash(true);
     await refetch();
     setRefreshing(false);
   };
@@ -889,6 +894,12 @@ export default function TablesScreen() {
           </View>
         </ModalBox>
       )}
+
+      {/* Custom Splash Screen */}
+      <CustomSplash 
+        visible={showSplash} 
+        onFinish={() => setShowSplash(false)} 
+      />
     </Screen>
   );
 }
