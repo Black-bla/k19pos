@@ -5,6 +5,7 @@ import { CategorySummary, OrderWithDetails, WaiterSummary } from '@/lib/types';
 import { Ionicons } from '@expo/vector-icons';
 import { format, subDays } from 'date-fns';
 import * as Print from 'expo-print';
+import * as FileSystem from 'expo-file-system';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
@@ -224,18 +225,53 @@ export default function DailyReportScreen() {
   const handleSavePDF = async () => {
     try {
       const html = generatePrintHTML();
+      
+      // Generate PDF in temp location first
       const result = await Print.printToFileAsync({
         html,
         base64: false,
       });
       
-      Alert.alert('Success', `Report saved to:\n${result.uri}`);
+      // Define the destination directory (Documents/K19Reports)
+      const documentsDir = FileSystem.documentDirectory;
+      const reportsDir = `${documentsDir}K19Reports/`;
       
-      // Try to share the PDF
-      await Share.share({
-        url: result.uri,
-        title: `Daily Report - ${selectedDate}`,
+      // Create directory if it doesn't exist
+      const dirInfo = await FileSystem.getInfoAsync(reportsDir);
+      if (!dirInfo.exists) {
+        await FileSystem.makeDirectoryAsync(reportsDir, { intermediates: true });
+      }
+      
+      // Create filename with date
+      const filename = `Daily_Report_${selectedDate}.pdf`;
+      const destinationUri = `${reportsDir}${filename}`;
+      
+      // Move the file to the destination
+      await FileSystem.moveAsync({
+        from: result.uri,
+        to: destinationUri,
       });
+      
+      Alert.alert(
+        'Success', 
+        `Report saved to:\n${destinationUri}\n\nWould you like to share it?`,
+        [
+          { text: 'No', style: 'cancel' },
+          { 
+            text: 'Share', 
+            onPress: async () => {
+              try {
+                await Share.share({
+                  url: destinationUri,
+                  title: `Daily Report - ${selectedDate}`,
+                });
+              } catch (shareErr) {
+                console.error('Share error:', shareErr);
+              }
+            }
+          }
+        ]
+      );
     } catch (err) {
       Alert.alert('Error', 'Failed to save PDF');
       console.error(err);
