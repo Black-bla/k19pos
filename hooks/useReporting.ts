@@ -37,18 +37,23 @@ export const useReporting = () => {
             table:tables(name)
           )
         `
-        )
-        .order('guest.created_at', { ascending: true });
+        );
 
       if (ordersError) throw ordersError;
 
-      // Filter orders by date on the client side
-      const filteredOrders = ordersData?.filter((order: any) => {
-        const guestDate = order.guest?.created_at;
-        if (!guestDate) return false;
-        const orderDate = new Date(guestDate).toISOString().split('T')[0];
-        return orderDate === date;
-      }) || [];
+      // Filter and sort orders by date on the client side
+      const filteredOrders = (ordersData || [])
+        .filter((order: any) => {
+          const guestDate = order.guest?.created_at;
+          if (!guestDate) return false;
+          const orderDate = new Date(guestDate).toISOString().split('T')[0];
+          return orderDate === date;
+        })
+        .sort((a: any, b: any) => {
+          const dateA = new Date(a.guest?.created_at || 0).getTime();
+          const dateB = new Date(b.guest?.created_at || 0).getTime();
+          return dateA - dateB;
+        });
 
       // 1b. Fetch all staff profiles to map waiter IDs to names
       const { data: staffData, error: staffError } = await supabase
