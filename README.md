@@ -1,12 +1,12 @@
 # K19 POS - Restaurant Point of Sale System 🍽️
 
-A modern, **local-first** point-of-sale system built with React Native (Expo) and Supabase, designed for restaurants with table management, menu control, reservations, order tracking, and **M-Pesa payment integration**.
+A modern, **local-first** point-of-sale system built with React Native (Expo) and Supabase, designed for restaurants with table management, menu control, reservations, order tracking, kitchen workflow, and **M-Pesa payment integration**.
 
 ## ⚡ Quick Start
 
 ```bash
 # 1. Clone & install
-git clone <repo-url>
+git clone https://github.com/Black-bla/k19pos.git
 cd k19pos
 npm install
 
@@ -32,11 +32,34 @@ npx expo start
 - **Real-time updates** - Changes sync automatically in the background
 
 ### Core Functionality
-- **Table Management** - Visual table cards with status tracking (available, occupied, reserved)
+- **Table Management** - Visual table cards with status tracking and waiter assignments
+  - Waiter-specific table filtering (view only your assigned tables)
+  - Real-time table status updates
+  - Guest capacity and occupancy tracking
 - **Menu Management** - Daily menu creation with starters, main meals (3-component system), desserts, and drinks
-- **Reservations** - Guest booking system with time slots
-- **Order Processing** - Track orders by table with real-time status updates
-- **User Management** - Role-based access control (admin, manager, chef, staff)
+  - Quick create for standard menus
+  - Custom menu creation with flexible pricing
+  - Edit mode for updating menu items
+- **Guest Management** - Track individual guests with detailed information
+  - Guest count display and filtering
+  - Status-based guest filtering (pending, ordered, served, paid, etc.)
+  - Waiter assignment and filtering
+- **Order Processing** - Track orders by guest with real-time status updates
+  - Individual guest ordering
+  - Kitchen status tracking
+  - Order history and modifications
+- **Kitchen Display** - Dedicated kitchen view for order preparation
+  - Order status workflow (pending → preparing → ready)
+  - Timestamp tracking for order times
+  - Priority and timing management
+- **Reservations** - Guest booking system with time slots and table assignments
+- **User Management** - Role-based access control (admin, manager, chef, staff, waiter)
+- **Daily Reporting** - Comprehensive sales and performance analytics
+  - Daily revenue summaries
+  - Waiter performance metrics
+  - Category-based sales breakdown
+  - Export to CSV, PDF, and print
+  - Detailed order logs
 
 ### Payment Integration 💳
 - **M-Pesa Payments** - Real-time STK Push payments via Lipana API
@@ -45,6 +68,7 @@ npx expo start
 - **Webhook Processing** - Real-time payment confirmation and webhook callbacks
 - **Table Availability** - Automatic table availability when all guests are paid
 - **Transaction Audit** - Full payment transaction history and audit trail
+- **Payment Dashboard** - Centralized view of all transactions
 
 ### Menu System
 - **Service Date Tracking** - Menus tied to specific dates
@@ -225,17 +249,44 @@ k19pos/
 │   ├── (auth)/            # Authentication screens
 │   │   └── login.tsx
 │   ├── (tabs)/            # Main app tabs
-│   │   ├── index.tsx      # Tables screen
-│   │   ├── menu.tsx       # Menu list screen
-│   │   ├── reservations.tsx
-│   │   └── _layout.tsx
+│   │   ├── index.tsx      # Tables screen (with waiter filter)
+│   │   ├── menu.tsx       # Menu management screen
+│   │   ├── guests.tsx     # Guest tracking screen
+│   │   ├── kitchen.tsx    # Kitchen display screen
+│   │   ├── reservations.tsx # Reservation management
+│   │   ├── users.tsx      # User management (admin/manager)
+│   │   ├── report.tsx     # Daily reporting & analytics
+│   │   ├── profile.tsx    # User profile & settings
+│   │   └── _layout.tsx    # Tab navigation layout
 │   ├── order/             # Order management
-│   │   └── [id].tsx
-│   └── payment/           # Payment processing
-│       └── [orderId].tsx
+│   │   └── [id].tsx       # Guest order details
+│   ├── payment/           # Payment processing
+│   │   └── [orderId].tsx  # Payment flow
+│   └── payments.tsx       # Payment dashboard
 ├── components/            # Reusable components
-├── context/              # React Context (Auth)
+│   ├── screens/          # Screen components
+│   │   ├── MenuListScreen.tsx
+│   │   ├── MenuEditScreen.tsx
+│   │   ├── MenuViewScreen.tsx
+│   │   └── OrderManagementScreen.tsx
+│   ├── GuestCard.tsx     # Guest display card
+│   ├── MenuItemCard.tsx  # Menu item card
+│   ├── OrderItemRow.tsx  # Order item display
+│   ├── Screen.tsx        # Safe area wrapper
+│   ├── StatusBadge.tsx   # Status indicator
+│   ├── TableCard.tsx     # Table display card
+│   ├── TableDetail.tsx   # Table details modal
+│   ├── Toast.tsx         # Toast notifications
+│   └── ModalBox.tsx      # Reusable modal
+├── context/              # React Context
+│   ├── AuthContext.tsx   # Authentication state
+│   └── ThemeContext.tsx  # Theme management (light/dark)
 ├── hooks/                # Custom React hooks
+│   ├── useTables.ts      # Table data hook
+│   ├── useOrders.ts      # Order data hook
+│   ├── useReservations.ts # Reservation data hook
+│   ├── useGuestsWithOrders.ts # Guest data hook
+│   └── useReporting.ts   # Reporting data hook
 ├── lib/                  # Core libraries
 │   ├── supabase.ts       # Supabase client
 │   ├── lipana.ts         # Lipana payment client
@@ -243,12 +294,13 @@ k19pos/
 │   ├── syncManager.ts    # Offline sync logic
 │   ├── localDataAccess.ts # Local data operations
 │   └── types.ts          # TypeScript types
+├── constants/
+│   └── Colors.ts         # App color palette
 ├── supabase/
 │   ├── migrations/       # Database migrations
 │   └── functions/        # Edge functions (webhooks)
 │       ├── lipana-webhook/
 │       └── lipana-webhook-test/
-├── constants/            # App constants
 └── README.md             # This file
 ```
 
@@ -278,10 +330,11 @@ User Action → Local SQLite → Sync Queue → Background Sync → Supabase
 
 ## 👥 User Roles
 
-- **Admin** - Full system access, user management
-- **Manager** - Menu and staff management, reporting
-- **Chef** - View menus, update order status
-- **Staff** - Table management, order taking, basic operations
+- **Admin** - Full system access, user management, all reports
+- **Manager** - Menu and staff management, reporting, table oversight
+- **Chef** - Kitchen display, order status updates, menu viewing
+- **Waiter/Staff** - Table management, order taking, guest service, assigned table filtering
+- **Staff** - Basic operations, limited access
 
 ## 🎨 Design Philosophy
 
@@ -290,17 +343,23 @@ User Action → Local SQLite → Sync Queue → Background Sync → Supabase
 - **Fast & responsive** - Local-first = instant UI updates
 - **Role-based** - Different views for different staff roles
 - **Easy to use** - Intuitive card-based interface
+- **Dark mode support** - Automatic theme switching with system preferences
+- **Accessibility** - Safe area handling for notches and status bars
 
 ## 🛠️ Tech Stack
 
 - **Frontend**: React Native (Expo SDK 54)
 - **Navigation**: Expo Router (file-based routing)
 - **Database**: Supabase (PostgreSQL) + SQLite (local)
-- **Authentication**: Supabase Auth
+- **Authentication**: Supabase Auth with role-based access
 - **Payments**: Lipana M-Pesa STK Push API
 - **Offline Sync**: Custom sync engine with expo-sqlite
 - **Network Detection**: @react-native-community/netinfo
-- **UI**: React Native components with custom styling
+- **UI**: React Native components with custom theming
+- **Date Handling**: date-fns
+- **Printing**: expo-print (PDF generation)
+- **File System**: expo-file-system
+- **Sharing**: expo-sharing (PDF exports)
 
 ## 📦 Key Dependencies
 
@@ -312,9 +371,44 @@ User Action → Local SQLite → Sync Queue → Background Sync → Supabase
   "@supabase/supabase-js": "^2.x",
   "@react-native-community/netinfo": "latest",
   "react-native-calendars": "latest",
+  "react-native-safe-area-context": "latest",
+  "date-fns": "latest",
+  "expo-print": "latest",
+  "expo-file-system": "latest",
+  "expo-sharing": "latest",
   "uuid": "latest"
 }
 ```
+
+## 🆕 Recent Updates
+
+### Phase 6: Daily Reporting & Analytics ✅
+- Daily sales summaries with 8 key metrics
+- Waiter performance tracking
+- Category-based revenue breakdown
+- Detailed order history
+- Export to CSV, PDF, and print
+- Date navigation for historical reports
+
+### Phase 5: Kitchen Display System ✅
+- Real-time order display for kitchen
+- Order status workflow (pending → preparing → ready)
+- Timestamp tracking
+- Guest and table information
+
+### Navigation Improvements ✅
+- Quick access menu in profile for Menu, Users, and Reports
+- Back buttons on hidden screens
+- Waiter table filtering (My Tables / All Tables)
+- Guest count display in header
+- Reduced tab bar congestion
+
+### UI/UX Enhancements ✅
+- Dark theme support with proper contrast
+- Status bar handling with SafeAreaView
+- Improved table card styling
+- Better empty states
+- Toast notifications for user feedback
 
 ## 🔐 Security Notes
 
