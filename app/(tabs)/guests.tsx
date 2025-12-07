@@ -75,7 +75,10 @@ export default function GuestsScreen() {
   return (
     <Screen style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Guests</Text>
+        <View style={styles.headerContent}>
+          <Text style={styles.title}>Guests</Text>
+          <Text style={styles.guestCount}>{guests.length} {guests.length === 1 ? 'guest' : 'guests'}</Text>
+        </View>
         <Pressable style={styles.refreshBtn} onPress={refetch}>
           <Ionicons name="refresh" size={20} color="#0ea5e9" />
         </Pressable>
@@ -188,11 +191,20 @@ function createStyles(theme: any) {
       borderBottomWidth: 1,
       borderBottomColor: c.border,
     },
+    headerContent: {
+      flex: 1,
+    },
     title: {
       fontSize: 32,
       fontWeight: '800',
       color: c.text,
       letterSpacing: -0.5,
+    },
+    guestCount: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: c.subtext,
+      marginTop: 4,
     },
     refreshBtn: {
       padding: 8,

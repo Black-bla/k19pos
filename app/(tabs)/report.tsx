@@ -2,10 +2,10 @@ import Screen from '@/components/Screen';
 import { useTheme } from '@/context/ThemeContext';
 import { useReporting } from '@/hooks/useReporting';
 import { CategorySummary, OrderWithDetails, WaiterSummary } from '@/lib/types';
+import { Ionicons } from '@expo/vector-icons';
 import { format, subDays } from 'date-fns';
 import * as Print from 'expo-print';
 import { useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
