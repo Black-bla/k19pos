@@ -232,11 +232,26 @@ export default function DailyReportScreen() {
         base64: false,
       });
       
-      // Check if documentDirectory is available, fallback to cacheDirectory
-      const baseDir = FileSystem.documentDirectory || FileSystem.cacheDirectory;
+      // Debug: Log all available directories
+      console.log('FileSystem.documentDirectory:', FileSystem.documentDirectory);
+      console.log('FileSystem.cacheDirectory:', FileSystem.cacheDirectory);
+      console.log('All FileSystem properties:', Object.keys(FileSystem));
       
+      // Check if documentDirectory is available, fallback to cacheDirectory
+      let baseDir = FileSystem.documentDirectory || FileSystem.cacheDirectory;
+      
+      // If both are null/undefined, try to use the temp file location as fallback
       if (!baseDir) {
-        throw new Error('No storage directory available');
+        console.log('No standard directories available, using temp file directory');
+        // Extract the directory from the temp file path
+        const tempUri = result.uri;
+        const lastSlash = tempUri.lastIndexOf('/');
+        if (lastSlash > 0) {
+          baseDir = tempUri.substring(0, lastSlash + 1);
+          console.log('Using temp directory as base:', baseDir);
+        } else {
+          throw new Error('No storage directory available');
+        }
       }
       
       const reportsDir = `${baseDir}K19Reports/`;
