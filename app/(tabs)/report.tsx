@@ -4,20 +4,20 @@ import { useReporting } from '@/hooks/useReporting';
 import { CategorySummary, OrderWithDetails, WaiterSummary } from '@/lib/types';
 import { Ionicons } from '@expo/vector-icons';
 import { format, subDays } from 'date-fns';
-import * as Print from 'expo-print';
 import * as FileSystem from 'expo-file-system';
+import * as Print from 'expo-print';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  FlatList,
-  Pressable,
-  ScrollView,
-  Share,
-  StyleSheet,
-  Text,
-  View,
+    ActivityIndicator,
+    Alert,
+    FlatList,
+    Pressable,
+    ScrollView,
+    Share,
+    StyleSheet,
+    Text,
+    View,
 } from 'react-native';
 
 export default function DailyReportScreen() {
@@ -232,29 +232,31 @@ export default function DailyReportScreen() {
         base64: false,
       });
       
-      // Define the destination directory (Documents/K19Reports)
+      // Use the device's Documents directory (platform-specific)
       const documentsDir = FileSystem.documentDirectory;
       const reportsDir = `${documentsDir}K19Reports/`;
       
-      // Create directory if it doesn't exist
-      const dirInfo = await FileSystem.getInfoAsync(reportsDir);
-      if (!dirInfo.exists) {
-        await FileSystem.makeDirectoryAsync(reportsDir, { intermediates: true });
+      // Create directory using new API
+      try {
+        const dir = new FileSystem.Directory(reportsDir);
+        await dir.create();
+      } catch (err) {
+        // Directory might already exist, which is fine
+        console.log('Directory exists or created:', reportsDir);
       }
       
       // Create filename with date
       const filename = `Daily_Report_${selectedDate}.pdf`;
       const destinationUri = `${reportsDir}${filename}`;
       
-      // Move the file to the destination
-      await FileSystem.moveAsync({
-        from: result.uri,
-        to: destinationUri,
-      });
+      // Move the file to the destination using new API
+      const sourceFile = new FileSystem.File(result.uri);
+      const destFile = new FileSystem.File(destinationUri);
+      await sourceFile.move(destFile);
       
       Alert.alert(
         'Success', 
-        `Report saved to:\n${destinationUri}\n\nWould you like to share it?`,
+        `Report saved to Documents:\nK19Reports/${filename}\n\nWould you like to share it?`,
         [
           { text: 'No', style: 'cancel' },
           { 
@@ -273,8 +275,8 @@ export default function DailyReportScreen() {
         ]
       );
     } catch (err) {
-      Alert.alert('Error', 'Failed to save PDF');
-      console.error(err);
+      Alert.alert('Error', 'Failed to save PDF: ' + (err instanceof Error ? err.message : String(err)));
+      console.error('PDF save error:', err);
     }
   };
 
