@@ -1,3 +1,4 @@
+import Screen from '@/components/Screen';
 import { useTheme } from '@/context/ThemeContext';
 import { useReporting } from '@/hooks/useReporting';
 import { CategorySummary, OrderWithDetails, WaiterSummary } from '@/lib/types';
@@ -15,10 +16,6 @@ import {
   Text,
   View,
 } from 'react-native';
-
-const Screen = ({ children }: any) => (
-  <View style={styles.safeArea}>{children}</View>
-);
 
 export default function DailyReportScreen() {
   const { theme } = useTheme();
@@ -261,7 +258,6 @@ export default function DailyReportScreen() {
   return (
     <Screen>
       <View style={[styles.container, { backgroundColor: c.background }]}>
-        {/* Header */}
         <View style={[styles.header, { backgroundColor: c.card, borderBottomColor: c.border }]}>
           <Text style={[styles.title, { color: c.text }]}>Daily Report</Text>
 
@@ -516,9 +512,6 @@ function KPICard({
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-  },
   container: {
     flex: 1,
   },
