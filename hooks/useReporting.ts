@@ -33,16 +33,22 @@ export const useReporting = () => {
             guest_name,
             table_id,
             waiter_id,
+            created_at,
             table:tables(name)
-          ),
-          created_at
+          )
         `
         )
-        .gte('created_at', `${date}T00:00:00`)
-        .lt('created_at', `${date}T23:59:59`)
-        .order('created_at', { ascending: true });
+        .order('guest.created_at', { ascending: true });
 
       if (ordersError) throw ordersError;
+
+      // Filter orders by date on the client side
+      const filteredOrders = ordersData?.filter((order: any) => {
+        const guestDate = order.guest?.created_at;
+        if (!guestDate) return false;
+        const orderDate = new Date(guestDate).toISOString().split('T')[0];
+        return orderDate === date;
+      }) || [];
 
       // 1b. Fetch all staff profiles to map waiter IDs to names
       const { data: staffData, error: staffError } = await supabase
@@ -103,8 +109,8 @@ export const useReporting = () => {
       const guestIds = new Set<string>();
 
       // Build orders array
-      if (ordersData) {
-        ordersData.forEach((order: any) => {
+      if (filteredOrders && filteredOrders.length > 0) {
+        filteredOrders.forEach((order: any) => {
           const subtotal = (order.price_snapshot || 0) * order.quantity;
           grossSales += subtotal;
 
@@ -114,6 +120,7 @@ export const useReporting = () => {
           const waiter_name = waiter_id ? waiterNameMap.get(waiter_id) : null;
           const menu_item_name = order.menu_item_name || 'Unknown Item';
           const menu_item_id = order.menu_item_id;
+          const created_at = guest?.created_at || new Date().toISOString();
 
           orders.push({
             guest_id: guest?.id || '',
@@ -124,7 +131,7 @@ export const useReporting = () => {
             quantity: order.quantity,
             price_snapshot: order.price_snapshot,
             subtotal,
-            created_at: order.created_at,
+            created_at: created_at,
           });
 
           // Track waiter sales
