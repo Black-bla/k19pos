@@ -534,13 +534,27 @@ export default function TablesScreen() {
 
       {/* Tables Grid */}
       {filteredTables.length === 0 ? (
-        <View style={styles.centerContent}>
-          <Text style={styles.emptyText}>
-            {showMyTablesOnly ? 'No tables assigned to you' : 'No tables yet'}
-          </Text>
-          <Text style={styles.emptySubtext}>
-            {showMyTablesOnly ? 'Your assigned tables will appear here' : 'Tap "Add Table" to get started'}
-          </Text>
+        <View style={styles.emptyStateContainer}>
+          <View style={styles.centerContent}>
+            <Text style={styles.emptyText}>
+              {showMyTablesOnly ? 'No tables assigned to you' : 'No tables yet'}
+            </Text>
+            <Text style={styles.emptySubtext}>
+              {showMyTablesOnly ? 'Your assigned tables will appear here' : 'Tap "Add Table" to get started'}
+            </Text>
+          </View>
+          <View style={styles.emptyAddTableContainer}>
+            <Pressable
+              style={[styles.tableCard, styles.addTableCard]}
+              onPress={() => setAddModalOpen(true)}
+              android_ripple={{ color: theme.colors.ripple }}
+            >
+              <View style={styles.addTableContent}>
+                <Ionicons name="add-circle" size={48} color={theme.colors.primary} />
+                <Text style={styles.addTableText}>Add Table</Text>
+              </View>
+            </Pressable>
+          </View>
         </View>
       ) : (
         <FlatList
@@ -916,6 +930,14 @@ function createStyles(theme: any) {
       justifyContent: 'center',
       alignItems: 'center',
       padding: 20,
+    },
+    emptyStateContainer: {
+      flex: 1,
+    },
+    emptyAddTableContainer: {
+      padding: 12,
+      alignItems: 'center',
+      justifyContent: 'center',
     },
     loadingText: {
       fontSize: 16,
