@@ -1,10 +1,18 @@
+import { useTheme } from '@/context/ThemeContext';
 import { Ionicons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
 
 export default function TabLayout() {
+  const { theme } = useTheme();
+
   return (
     <Tabs screenOptions={{ 
-      tabBarActiveTintColor: "#10b981",
+      tabBarActiveTintColor: theme.colors.primary,
+      tabBarInactiveTintColor: theme.colors.muted,
+      tabBarStyle: {
+        backgroundColor: theme.colors.tabBar,
+        borderTopColor: theme.colors.tabBarBorder,
+      },
       headerShown: false,
     }}>
       <Tabs.Screen
@@ -26,12 +34,6 @@ export default function TabLayout() {
         options={{
           title: "Kitchen",
           tabBarIcon: ({ color }) => <Ionicons name="flame" size={24} color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="menu-edit"
-        options={{
-          href: null,
         }}
       />
       <Tabs.Screen
@@ -59,6 +61,13 @@ export default function TabLayout() {
         options={{
           title: 'Profile',
           tabBarIcon: ({ color }) => <Ionicons name="person" size={24} color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="report"
+        options={{
+          title: 'Report',
+          tabBarIcon: ({ color }) => <Ionicons name="bar-chart" size={24} color={color} />,
         }}
       />
     </Tabs>

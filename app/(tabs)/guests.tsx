@@ -1,6 +1,8 @@
 import GuestCard from '@/components/GuestCard';
 import Screen from '@/components/Screen';
+import { useTheme } from '@/context/ThemeContext';
 import { useGuestsWithOrders } from "@/hooks/useGuestsWithOrders";
+import { supabase } from '@/lib/supabase';
 import { GuestStatus } from '@/lib/types';
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useMemo, useState } from 'react';
@@ -27,10 +29,13 @@ const STATUS_OPTIONS: { label: string; value: FilterType }[] = [
 ];
 
 export default function GuestsScreen() {
+  const { theme } = useTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
   const { guests, loading, refetch } = useGuestsWithOrders();
   const scaleAnim = useMemo(() => new Animated.Value(0), []);
   const [filterStatus, setFilterStatus] = useState<FilterType>('all');
-  const [filterTable, setFilterTable] = useState<string | null>(null);
+  const [waiters, setWaiters] = useState<{ id: string; name: string }[]>([]);
+  const [filterWaiter, setFilterWaiter] = useState<string | null>(null);
 
   useEffect(() => {
     if (guests.length === 0 && !loading) {
@@ -42,19 +47,30 @@ export default function GuestsScreen() {
     }
   }, [guests.length, loading, scaleAnim]);
 
-  // Get unique tables for filter dropdown
-  const uniqueTables = useMemo(() => {
-    return Array.from(new Set(guests.map(g => g.table_id))).sort();
-  }, [guests]);
+  useEffect(() => {
+    supabase
+      .from('staff_profiles')
+      .select('id, name')
+      .order('name')
+      .then(({ data }) => {
+        if (data) setWaiters(data);
+      });
+  }, []);
+
+  const uniqueWaiters = useMemo(() => {
+    const ids = new Set<string>();
+    guests.forEach(g => { if (g.waiter_id) ids.add(g.waiter_id); });
+    return waiters.filter(w => ids.has(w.id));
+  }, [guests, waiters]);
 
   // Filter guests based on selected filters
   const filteredGuests = useMemo(() => {
     return guests.filter(guest => {
       const statusMatch = filterStatus === 'all' || guest.status === filterStatus;
-      const tableMatch = filterTable === null || guest.table_id === filterTable;
-      return statusMatch && tableMatch;
+      const waiterMatch = filterWaiter === null || guest.waiter_id === filterWaiter;
+      return statusMatch && waiterMatch;
     });
-  }, [guests, filterStatus, filterTable]);
+  }, [guests, filterStatus, filterWaiter]);
 
   return (
     <Screen style={styles.container}>
@@ -67,8 +83,8 @@ export default function GuestsScreen() {
 
       {/* Filters */}
       <View style={styles.filtersContainer}>
-        <ScrollView 
-          horizontal 
+        <ScrollView
+          horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.filterScroll}
         >
@@ -77,14 +93,16 @@ export default function GuestsScreen() {
               key={option.value}
               style={[
                 styles.filterBtn,
-                filterStatus === option.value && styles.filterBtnActive
+                filterStatus === option.value && styles.filterBtnActive,
               ]}
               onPress={() => setFilterStatus(option.value)}
             >
-              <Text style={[
-                styles.filterText,
-                filterStatus === option.value && styles.filterTextActive
-              ]}>
+              <Text
+                style={[
+                  styles.filterText,
+                  filterStatus === option.value && styles.filterTextActive,
+                ]}
+              >
                 {option.label}
               </Text>
             </Pressable>
@@ -92,42 +110,30 @@ export default function GuestsScreen() {
         </ScrollView>
       </View>
 
-      {/* Table Filter */}
-      {uniqueTables.length > 1 && (
-        <View style={styles.tableFilterContainer}>
-          <ScrollView 
-            horizontal 
+      {/* Waiter Filter */}
+      {uniqueWaiters.length > 0 && (
+        <View style={styles.waiterFilterContainer}>
+          <ScrollView
+            horizontal
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.filterScroll}
           >
             <Pressable
-              style={[
-                styles.tableFilterBtn,
-                filterTable === null && styles.tableFilterBtnActive
-              ]}
-              onPress={() => setFilterTable(null)}
+              style={[styles.waiterChip, filterWaiter === null && styles.waiterChipActive]}
+              onPress={() => setFilterWaiter(null)}
             >
-              <Text style={[
-                styles.tableFilterText,
-                filterTable === null && styles.tableFilterTextActive
-              ]}>
-                All Tables
+              <Text style={[styles.waiterChipText, filterWaiter === null && styles.waiterChipTextActive]}>
+                All Waiters
               </Text>
             </Pressable>
-            {uniqueTables.map(tableId => (
+            {uniqueWaiters.map(waiter => (
               <Pressable
-                key={tableId}
-                style={[
-                  styles.tableFilterBtn,
-                  filterTable === tableId && styles.tableFilterBtnActive
-                ]}
-                onPress={() => setFilterTable(tableId)}
+                key={waiter.id}
+                style={[styles.waiterChip, filterWaiter === waiter.id && styles.waiterChipActive]}
+                onPress={() => setFilterWaiter(waiter.id)}
               >
-                <Text style={[
-                  styles.tableFilterText,
-                  filterTable === tableId && styles.tableFilterTextActive
-                ]}>
-                  {tableId}
+                <Text style={[styles.waiterChipText, filterWaiter === waiter.id && styles.waiterChipTextActive]}>
+                  {waiter.name}
                 </Text>
               </Pressable>
             ))}
@@ -163,6 +169,124 @@ export default function GuestsScreen() {
       )}
     </Screen>
   );
+}
+
+function createStyles(theme: any) {
+  const c = theme.colors;
+  return StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: c.background,
+    },
+    header: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingHorizontal: 20,
+      paddingVertical: 16,
+      backgroundColor: c.card,
+      borderBottomWidth: 1,
+      borderBottomColor: c.border,
+    },
+    title: {
+      fontSize: 32,
+      fontWeight: '800',
+      color: c.text,
+      letterSpacing: -0.5,
+    },
+    refreshBtn: {
+      padding: 8,
+      borderRadius: 8,
+      backgroundColor: c.background,
+    },
+    filtersContainer: {
+      backgroundColor: c.card,
+      borderBottomWidth: 1,
+      borderBottomColor: c.border,
+      paddingVertical: 12,
+    },
+    filterScroll: {
+      paddingHorizontal: 16,
+      gap: 8,
+    },
+    filterBtn: {
+      paddingHorizontal: 14,
+      paddingVertical: 8,
+      borderRadius: 20,
+      backgroundColor: c.input,
+      borderWidth: 1,
+      borderColor: c.border,
+    },
+    filterBtnActive: {
+      backgroundColor: '#0ea5e9',
+      borderColor: '#0ea5e9',
+    },
+    filterText: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: c.subtext,
+    },
+    filterTextActive: {
+      color: '#fff',
+    },
+    waiterFilterContainer: {
+      backgroundColor: c.card,
+      paddingVertical: 10,
+      borderBottomWidth: 1,
+      borderBottomColor: c.border,
+    },
+    waiterChip: {
+      paddingHorizontal: 14,
+      paddingVertical: 8,
+      borderRadius: 18,
+      backgroundColor: c.input,
+      borderWidth: 1,
+      borderColor: c.border,
+    },
+    waiterChipActive: {
+      backgroundColor: c.primary,
+      borderColor: c.primary,
+    },
+    waiterChipText: {
+      fontSize: 13,
+      fontWeight: '700',
+      color: c.text,
+    },
+    waiterChipTextActive: {
+      color: '#fff',
+    },
+    list: {
+      padding: 16,
+      paddingBottom: 20,
+    },
+    loadingText: {
+      fontSize: 16,
+      color: c.subtext,
+      textAlign: 'center',
+      marginTop: 20,
+    },
+    emptyContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      paddingHorizontal: 32,
+    },
+    iconWrapper: {
+      marginBottom: 16,
+    },
+    emptyText: {
+      fontSize: 18,
+      fontWeight: '700',
+      color: c.text,
+      textAlign: 'center',
+      marginBottom: 8,
+    },
+    emptySubtext: {
+      fontSize: 14,
+      color: c.subtext,
+      textAlign: 'center',
+    },
+  });
 }
 
 const styles = StyleSheet.create({
@@ -221,30 +345,30 @@ const styles = StyleSheet.create({
   filterTextActive: {
     color: '#fff',
   },
-  tableFilterContainer: {
+  waiterFilterContainer: {
     backgroundColor: '#fff',
-    paddingVertical: 12,
+    paddingVertical: 10,
     borderBottomWidth: 1,
     borderBottomColor: '#e2e8f0',
   },
-  tableFilterBtn: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
+  waiterChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 18,
     backgroundColor: '#f8fafc',
     borderWidth: 1,
     borderColor: '#cbd5e1',
   },
-  tableFilterBtnActive: {
-    backgroundColor: '#10b981',
-    borderColor: '#10b981',
+  waiterChipActive: {
+    backgroundColor: '#0ea5e9',
+    borderColor: '#0ea5e9',
   },
-  tableFilterText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#64748b',
+  waiterChipText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#0f172a',
   },
-  tableFilterTextActive: {
+  waiterChipTextActive: {
     color: '#fff',
   },
   list: {

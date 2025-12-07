@@ -1,6 +1,10 @@
 import { supabase } from '@/lib/supabase';
 import { Order, OrderItem } from '@/lib/types';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useEffect, useState } from 'react';
+
+const ORDER_CACHE_KEY = (orderId: string) => `order-cache-${orderId}-v1`;
+const ORDER_ITEMS_CACHE_KEY = (orderId: string) => `order-items-cache-${orderId}-v1`;
 
 export function useOrder(orderId: string) {
   const [order, setOrder] = useState<Order | null>(null);
@@ -8,6 +12,7 @@ export function useOrder(orderId: string) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    hydrateFromCache();
     fetchOrder();
     fetchItems();
     const itemsChannel = supabase
@@ -23,22 +28,70 @@ export function useOrder(orderId: string) {
   }, [orderId]);
 
   async function fetchOrder() {
-    const { data } = await supabase
-      .from('orders')
-      .select('*')
-      .eq('id', orderId)
-      .single();
-    if (data) setOrder(data);
-    setLoading(false);
+    try {
+      const { data, error } = await supabase
+        .from('orders')
+        .select('*')
+        .eq('id', orderId)
+        .single();
+      if (error) throw error;
+      if (data) {
+        setOrder(data);
+        await AsyncStorage.setItem(ORDER_CACHE_KEY(orderId), JSON.stringify(data));
+      }
+    } catch (err) {
+      console.warn('fetchOrder failed, using cache', err);
+      try {
+        const cached = await AsyncStorage.getItem(ORDER_CACHE_KEY(orderId));
+        if (cached) setOrder(JSON.parse(cached));
+      } catch (cacheErr) {
+        console.warn('failed to load cached order after fetch error', cacheErr);
+      }
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function fetchItems() {
-    const { data } = await supabase
-      .from('order_items')
-      .select('*')
-      .eq('order_id', orderId)
-      .order('created_at');
-    if (data) setItems(data as OrderItem[]);
+    try {
+      const { data, error } = await supabase
+        .from('order_items')
+        .select('*')
+        .eq('order_id', orderId)
+        .order('created_at');
+
+      if (error) throw error;
+      if (data) {
+        setItems(data as OrderItem[]);
+        await AsyncStorage.setItem(ORDER_ITEMS_CACHE_KEY(orderId), JSON.stringify(data));
+      }
+    } catch (err) {
+      console.warn('fetchItems failed, using cache', err);
+      try {
+        const cached = await AsyncStorage.getItem(ORDER_ITEMS_CACHE_KEY(orderId));
+        if (cached) setItems(JSON.parse(cached));
+      } catch (cacheErr) {
+        console.warn('failed to load cached order items after fetch error', cacheErr);
+      }
+    }
+  }
+
+  async function hydrateFromCache() {
+    try {
+      const [orderCache, itemsCache] = await Promise.all([
+        AsyncStorage.getItem(ORDER_CACHE_KEY(orderId)),
+        AsyncStorage.getItem(ORDER_ITEMS_CACHE_KEY(orderId)),
+      ]);
+
+      if (orderCache) setOrder(JSON.parse(orderCache));
+      if (itemsCache) setItems(JSON.parse(itemsCache));
+
+      if (orderCache || itemsCache) {
+        setLoading(false);
+      }
+    } catch (err) {
+      console.warn('hydrateFromCache failed', err);
+    }
   }
 
   async function updateQuantity(itemId: string, change: number) {

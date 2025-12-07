@@ -1,10 +1,12 @@
 import Screen from '@/components/Screen';
+import { showToast } from '@/components/Toast';
 import { useAuth } from '@/context/AuthContext';
+import { useTheme } from '@/context/ThemeContext';
 import { deleteMenuItemsByDateLocal, getAllMenuItemsLocal, getStaffProfileByIdLocal, insertMenuItemLocal } from '@/lib/localDataAccess';
 import { syncWithSupabase } from '@/lib/syncManager';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import MenuEditScreen from './MenuEditScreen';
 import MenuViewScreen from './MenuViewScreen';
@@ -23,6 +25,7 @@ type MenuSummary = {
 export default function MenuListScreen() {
   const auth = useAuth();
   const router = useRouter();
+  const { theme } = useTheme();
   const [menus, setMenus] = useState<MenuSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
@@ -31,6 +34,7 @@ export default function MenuListScreen() {
   const [selectedDate, setSelectedDate] = useState<string>('');
   const [selectedOwnerId, setSelectedOwnerId] = useState<string>('');
 
+  const styles = useMemo(() => createStyles(theme), [theme]);
   const userHasMenu = menus.some(menu => menu.created_by === auth.user?.id);
   const canCreate = !!auth.user;
 
@@ -148,12 +152,12 @@ export default function MenuListScreen() {
         });
       }
 
-      Alert.alert('Success', 'Menu created for ' + serviceDate + ' (will sync when online)');
+      showToast('Menu created for ' + serviceDate + ' (will sync when online)', 'success', 4000, 'card');
       fetchMenus();
       setCreating(false);
     } catch (e) {
       console.error('Error creating menu:', e);
-      Alert.alert('Error', 'Failed to create menu');
+      showToast('Failed to create menu', 'error', 3500, 'card');
       setCreating(false);
     }
   }
@@ -183,11 +187,11 @@ export default function MenuListScreen() {
             try {
               // Delete from local database (works offline)
               await deleteMenuItemsByDateLocal(auth.user?.id!, serviceDate);
-              Alert.alert('Success', 'Menu deleted (will sync when online)');
+              showToast('Menu deleted (will sync when online)', 'success', 4000, 'card');
               fetchMenus();
             } catch (error) {
               console.error('Error deleting menu:', error);
-              Alert.alert('Error', 'Failed to delete menu');
+              showToast('Failed to delete menu', 'error', 3500, 'card');
             }
           }
         }
@@ -485,6 +489,87 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     backgroundColor: '#fef2f2',
   },
+});
+
+const baseStyles = StyleSheet.create({
+  addButtonText: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 14,
+  },
+  loadingText: {
+    padding: 16,
+    textAlign: 'center',
+  },
+  emptyState: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 32,
+  },
+  emptyTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    marginTop: 16,
+  },
+  emptyText: {
+    fontSize: 14,
+    marginTop: 8,
+    textAlign: 'center',
+  },
+  emptyButton: {
+    marginTop: 24,
+    backgroundColor: '#0ea5e9',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  emptyButtonText: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 14,
+  },
+  content: {
+    flex: 1,
+    padding: 16,
+  },
+  menuCard: {
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+  },
+  menuHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  menuDate: {
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  menuCreator: {
+    fontSize: 13,
+    marginTop: 3,
+    fontWeight: '500',
+  },
+  menuCount: {
+    fontSize: 13,
+    marginTop: 2,
+  },
+  menuActions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  editButton: {
+    padding: 8,
+    borderRadius: 6,
+  },
+  deleteButton: {
+    padding: 8,
+    borderRadius: 6,
+  },
   menuCategories: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -497,11 +582,73 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 6,
-    backgroundColor: '#f8fafc',
   },
   categoryText: {
     fontSize: 12,
-    color: '#475569',
     fontWeight: '600',
   },
 });
+
+function createStyles(theme: any) {
+  const c = theme.colors;
+  const isDark = theme.isDark;
+
+  return StyleSheet.create({
+    ...baseStyles,
+    loadingText: {
+      ...baseStyles.loadingText,
+      color: c.subtext,
+    },
+    emptyState: baseStyles.emptyState,
+    emptyTitle: {
+      ...baseStyles.emptyTitle,
+      color: c.text,
+    },
+    emptyText: {
+      ...baseStyles.emptyText,
+      color: c.subtext,
+    },
+    emptyButton: baseStyles.emptyButton,
+    emptyButtonText: baseStyles.emptyButtonText,
+    content: {
+      ...baseStyles.content,
+      backgroundColor: c.background,
+    },
+    menuCard: {
+      ...baseStyles.menuCard,
+      backgroundColor: c.card,
+      borderColor: c.border,
+    },
+    menuHeader: baseStyles.menuHeader,
+    menuDate: {
+      ...baseStyles.menuDate,
+      color: c.text,
+    },
+    menuCreator: {
+      ...baseStyles.menuCreator,
+      color: c.subtext,
+    },
+    menuCount: {
+      ...baseStyles.menuCount,
+      color: c.subtext,
+    },
+    menuActions: baseStyles.menuActions,
+    editButton: {
+      ...baseStyles.editButton,
+      backgroundColor: c.muted,
+    },
+    deleteButton: {
+      ...baseStyles.deleteButton,
+      backgroundColor: isDark ? '#7f1d1d' : '#fee2e2',
+    },
+    menuCategories: baseStyles.menuCategories,
+    categoryBadge: {
+      ...baseStyles.categoryBadge,
+      backgroundColor: c.muted,
+    },
+    categoryText: {
+      ...baseStyles.categoryText,
+      color: c.subtext,
+    },
+  });
+}

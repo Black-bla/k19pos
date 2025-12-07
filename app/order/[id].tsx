@@ -1,8 +1,12 @@
 
 import OrderTakingScreen from '@/components/screens/OrderTakingScreen';
+import { useTheme } from '@/context/ThemeContext';
 import { router, useLocalSearchParams } from 'expo-router';
+import { useMemo } from 'react';
 
 export default function OrderScreen() {
+  const { theme } = useTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
   const { id } = useLocalSearchParams();
 
   function handleClose() {
@@ -16,3 +20,10 @@ export default function OrderScreen() {
     />
   );
 }
+
+function createStyles(theme: any) {
+  const c = theme.colors;
+  return {};
+}
+
+const styles = {};

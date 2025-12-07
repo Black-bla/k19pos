@@ -1,16 +1,17 @@
+import { showToast } from '@/components/Toast';
 import { supabase } from '@/lib/supabase';
 import { GuestOrder } from '@/lib/types';
 import { Ionicons } from '@expo/vector-icons';
 import React, { useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  FlatList,
-  Pressable,
-  RefreshControl,
-  StyleSheet,
-  Text,
-  View,
+    ActivityIndicator,
+    Alert,
+    FlatList,
+    Pressable,
+    RefreshControl,
+    StyleSheet,
+    Text,
+    View,
 } from 'react-native';
 
 interface Guest {
@@ -83,12 +84,12 @@ export default function OrderManagementScreen({
 
             if (error) throw error;
 
-            Alert.alert('Success', 'Order removed');
+            showToast('Order removed successfully', 'success', 3500, 'card');
             await fetchOrders();
             onOrdersUpdated();
           } catch (err) {
             console.error('Failed to delete order:', err);
-            Alert.alert('Error', 'Failed to remove order');
+            showToast('Failed to remove order', 'error', 3500, 'card');
           }
         },
       },

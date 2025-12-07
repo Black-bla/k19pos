@@ -1,11 +1,15 @@
 import Screen from '@/components/Screen';
+import { showToast } from '@/components/Toast';
 import { useAuth } from '@/context/AuthContext';
+import { useTheme } from '@/context/ThemeContext';
 import { supabase } from '@/lib/supabase';
 import { StaffProfile } from '@/lib/types';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, Image, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 export default function UsersScreen() {
+  const { theme } = useTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
   const { staffProfile } = useAuth();
   const [users, setUsers] = useState<StaffProfile[]>([]);
   const [loading, setLoading] = useState(false);
@@ -18,6 +22,7 @@ export default function UsersScreen() {
   const [newPhone, setNewPhone] = useState('');
   const [newRole, setNewRole] = useState('staff');
   const [creating, setCreating] = useState(false);
+  const [selectedAvatar, setSelectedAvatar] = useState<{ url: string; name: string } | null>(null);
 
   useEffect(() => {
     fetchUsers();
@@ -120,10 +125,11 @@ export default function UsersScreen() {
 
       if (profileError) {
         console.warn('create profile error', profileError);
-        Alert.alert('Warning', 'User created but profile setup failed: ' + profileError.message);
+        showToast('User created but profile setup failed: ' + profileError.message, 'warning', 4000, 'card');
+      } else {
+        showToast('User created successfully. They should check their email to confirm their account.', 'success', 4000, 'card');
       }
 
-      Alert.alert('Success', 'User created successfully. They should check their email to confirm their account.');
       setAddModalOpen(false);
       setNewEmail('');
       setNewPassword('');
@@ -163,13 +169,15 @@ export default function UsersScreen() {
               keyExtractor={(i) => i.id}
               renderItem={({ item }) => (
                 <View style={styles.row}>
-                  {item.avatar_url ? (
-                    <Image source={{ uri: item.avatar_url }} style={[styles.avatar, item.role === 'admin' ? styles.adminAvatar : null]} />
-                  ) : (
-                    <View style={[styles.avatarPlaceholder, item.role === 'admin' ? styles.adminAvatar : null]}>
-                      <Text style={styles.avatarInitials}>{(item.name || item.id).slice(0,2).toUpperCase()}</Text>
-                    </View>
-                  )}
+                  <Pressable onPress={() => item.avatar_url && setSelectedAvatar({ url: item.avatar_url, name: item.name || item.id })}>
+                    {item.avatar_url ? (
+                      <Image source={{ uri: item.avatar_url }} style={[styles.avatar, item.role === 'admin' ? styles.adminAvatar : null]} />
+                    ) : (
+                      <View style={[styles.avatarPlaceholder, item.role === 'admin' ? styles.adminAvatar : null]}>
+                        <Text style={styles.avatarInitials}>{(item.name || item.id).slice(0,2).toUpperCase()}</Text>
+                      </View>
+                    )}
+                  </Pressable>
                   <View style={{ flex: 1, marginLeft: 12 }}>
                     <Text style={styles.name}>{item.name || item.id}</Text>
                     <Text style={styles.small}>{item.phone ?? item.id}</Text>
@@ -214,11 +222,13 @@ export default function UsersScreen() {
             keyExtractor={(i) => i.id}
             renderItem={({ item }) => (
               <View style={styles.row}>
-                {item.avatar_url ? (
-                  <Image source={{ uri: item.avatar_url }} style={[styles.avatar, item.role === 'admin' ? styles.adminAvatar : null]} />
-                ) : (
-                  <View style={[styles.avatarPlaceholder, item.role === 'admin' ? styles.adminAvatar : null]}><Text style={styles.avatarInitials}>{(item.name || item.id).slice(0,2).toUpperCase()}</Text></View>
-                )}
+                <Pressable onPress={() => item.avatar_url && setSelectedAvatar({ url: item.avatar_url, name: item.name || item.id })}>
+                  {item.avatar_url ? (
+                    <Image source={{ uri: item.avatar_url }} style={[styles.avatar, item.role === 'admin' ? styles.adminAvatar : null]} />
+                  ) : (
+                    <View style={[styles.avatarPlaceholder, item.role === 'admin' ? styles.adminAvatar : null]}><Text style={styles.avatarInitials}>{(item.name || item.id).slice(0,2).toUpperCase()}</Text></View>
+                  )}
+                </Pressable>
                 <View style={{ flex: 1, marginLeft: 12 }}>
                   <Text style={styles.name}>{item.name || item.id}</Text>
                   <Text style={styles.small}>{item.phone ?? item.id}</Text>
@@ -319,45 +329,111 @@ export default function UsersScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Fullscreen Avatar Viewer */}
+      <Modal visible={selectedAvatar !== null} transparent animationType="fade" onRequestClose={() => setSelectedAvatar(null)}>
+        <Pressable style={styles.fullscreenAvatarOverlay} onPress={() => setSelectedAvatar(null)}>
+          <View style={styles.fullscreenAvatarContainer}>
+            <Pressable style={styles.closeButton} onPress={() => setSelectedAvatar(null)}>
+              <Text style={styles.closeButtonText}>✕</Text>
+            </Pressable>
+            {selectedAvatar && (
+              <>
+                <Image source={{ uri: selectedAvatar.url }} style={styles.fullscreenAvatar} />
+                <Text style={styles.avatarName}>{selectedAvatar.name}</Text>
+              </>
+            )}
+          </View>
+        </Pressable>
+      </Modal>
     </Screen>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f9fafb' },
-  header: { padding: 20, paddingTop: 60, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#e5e7eb' },
-  title: { fontSize: 22, fontWeight: '700', color: '#111827' },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 8, borderBottomWidth: 1, borderBottomColor: '#eef2ff' },
-  avatar: { width: 64, height: 64, borderRadius: 32 },
-  avatarPlaceholder: { width: 64, height: 64, borderRadius: 32, backgroundColor: '#e5e7eb', alignItems: 'center', justifyContent: 'center' },
-  avatarInitials: { color: '#374151', fontWeight: '700', fontSize: 16 },
-  name: { fontSize: 16, fontWeight: '700', color: '#111827' },
-  small: { color: '#6b7280', fontSize: 12 },
-  roleBtn: { paddingVertical: 8, paddingHorizontal: 14, borderRadius: 999, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#e6e7ee', minWidth: 74 },
-  roleText: { fontWeight: '700', color: '#111827' },
-  adminAvatar: { borderWidth: 3, borderColor: '#000' },
-  addBtn: { backgroundColor: '#10b981', paddingVertical: 12, paddingHorizontal: 16, borderRadius: 8, alignItems: 'center', marginBottom: 16 },
-  addText: { color: '#fff', fontWeight: '700', fontSize: 16 },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
-  modalBox: { width: '90%', maxWidth: 400, backgroundColor: '#fff', borderRadius: 16, padding: 24 },
-  modalTitle: { fontSize: 20, fontWeight: '700', marginBottom: 16, color: '#111827' },
-  input: { borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 8, padding: 12, marginBottom: 12, fontSize: 16 },
-  roleSelector: { marginBottom: 16 },
-  label: { fontSize: 14, fontWeight: '600', color: '#374151', marginBottom: 8 },
-  modalActions: { flexDirection: 'row', gap: 12, marginTop: 8 },
-  cancelBtn: { flex: 1, backgroundColor: '#6b7280', paddingVertical: 12, borderRadius: 8, alignItems: 'center' },
-  createBtn: { flex: 1, backgroundColor: '#10b981', paddingVertical: 12, borderRadius: 8, alignItems: 'center' },
-  btnText: { color: '#fff', fontWeight: '700', fontSize: 16 },
-  roleReadOnly: {
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 999,
-    backgroundColor: '#f3f4f6',
-  },
-  roleReadOnlyText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#6b7280',
-  },
-});
+function createStyles(theme: any) {
+  const c = theme.colors;
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: c.background },
+    header: { padding: 20, paddingTop: 60, backgroundColor: c.card, borderBottomWidth: 1, borderBottomColor: c.border },
+    title: { fontSize: 22, fontWeight: '700', color: c.text },
+    center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+    row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 8, borderBottomWidth: 1, borderBottomColor: c.border },
+    avatar: { width: 64, height: 64, borderRadius: 32 },
+    avatarPlaceholder: { width: 64, height: 64, borderRadius: 32, backgroundColor: c.border, alignItems: 'center', justifyContent: 'center' },
+    avatarInitials: { color: c.subtext, fontWeight: '700', fontSize: 16 },
+    name: { fontSize: 16, fontWeight: '700', color: c.text },
+    small: { color: c.muted, fontSize: 12 },
+    roleBtn: { paddingVertical: 8, paddingHorizontal: 14, borderRadius: 999, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: c.border, minWidth: 74 },
+    roleText: { fontWeight: '700', color: c.text },
+    adminAvatar: { borderWidth: 3, borderColor: c.text },
+    addBtn: { backgroundColor: c.primary, paddingVertical: 12, paddingHorizontal: 16, borderRadius: 8, alignItems: 'center', marginBottom: 16 },
+    addText: { color: '#fff', fontWeight: '700', fontSize: 16 },
+    modalOverlay: { flex: 1, backgroundColor: c.overlay, justifyContent: 'center', alignItems: 'center' },
+    modalBox: { width: '90%', maxWidth: 400, backgroundColor: c.card, borderRadius: 16, padding: 24 },
+    modalTitle: { fontSize: 20, fontWeight: '700', marginBottom: 16, color: c.text },
+    input: { borderWidth: 1, borderColor: c.border, borderRadius: 8, padding: 12, marginBottom: 12, fontSize: 16, backgroundColor: c.input, color: c.text },
+    roleSelector: { marginBottom: 16 },
+    label: { fontSize: 14, fontWeight: '600', color: c.subtext, marginBottom: 8 },
+    modalActions: { flexDirection: 'row', gap: 12, marginTop: 8 },
+    cancelBtn: { flex: 1, backgroundColor: c.muted, paddingVertical: 12, borderRadius: 8, alignItems: 'center' },
+    createBtn: { flex: 1, backgroundColor: c.primary, paddingVertical: 12, borderRadius: 8, alignItems: 'center' },
+    btnText: { color: '#fff', fontWeight: '700', fontSize: 16 },
+    roleReadOnly: {
+      paddingVertical: 6,
+      paddingHorizontal: 12,
+      borderRadius: 999,
+      backgroundColor: c.input,
+    },
+    roleReadOnlyText: {
+      fontSize: 12,
+      fontWeight: '600',
+      color: c.subtext,
+    },
+    // Fullscreen Avatar Viewer
+    fullscreenAvatarOverlay: {
+      flex: 1,
+      backgroundColor: '#000000',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    fullscreenAvatarContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      paddingHorizontal: 20,
+    },
+    fullscreenAvatar: {
+      width: '90%',
+      maxWidth: 500,
+      aspectRatio: 1,
+      borderRadius: 20,
+      resizeMode: 'cover',
+    },
+    avatarName: {
+      fontSize: 18,
+      fontWeight: '700',
+      color: '#fff',
+      marginTop: 20,
+      textAlign: 'center',
+    },
+    closeButton: {
+      position: 'absolute',
+      top: 40,
+      right: 20,
+      width: 50,
+      height: 50,
+      borderRadius: 25,
+      backgroundColor: 'rgba(255, 255, 255, 0.2)',
+      justifyContent: 'center',
+      alignItems: 'center',
+      zIndex: 10,
+    },
+    closeButtonText: {
+      fontSize: 28,
+      color: '#fff',
+      fontWeight: '700',
+    },
+  });
+}
+
+

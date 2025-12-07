@@ -64,12 +64,13 @@ export interface Order {
 export interface Reservation {
   id: string;
   name: string;
-  phone: string;
-  time: string; // ISO timestamp
-  table_id: string;
+  phone?: string | null;
+  date: string; // yyyy-mm-dd format
+  time: string; // HH:mm format
+  table_id?: string | null;
   status: 'pending' | 'seated' | 'cancelled' | 'no_show';
-  guest_name?: string;
-  seat_number?: number;
+  party_size?: number | null;
+  notes?: string | null;
 }
 
 export interface DailyMenu {
@@ -95,4 +96,57 @@ export interface StaffProfile {
   avatar_url?: string | null;
   phone?: string | null;
   created_at?: string | null;
+}
+
+// Phase 6: Reporting Types
+export interface OrderWithDetails {
+  guest_id: string;
+  guest_name: string;
+  table_name: string;
+  waiter_name?: string | null;
+  menu_item_name: string;
+  quantity: number;
+  price_snapshot: number;
+  subtotal: number;
+  order_status?: string;
+  created_at: string;
+}
+
+export interface WaiterSummary {
+  waiter_id: string;
+  waiter_name: string;
+  order_count: number;
+  total_sales: number;
+  total_tips: number;
+  net_revenue: number;
+  avg_check_size: number;
+  tables_served: number;
+}
+
+export interface CategorySummary {
+  category: string;
+  item_count: number;
+  quantity_sold: number;
+  total_revenue: number;
+  percentage_of_sales: number;
+}
+
+export interface DailyReportSummary {
+  date: string;
+  total_orders: number;
+  total_guests: number;
+  gross_sales: number;
+  total_tips: number;
+  net_revenue: number;
+  avg_check_size: number;
+  items_sold: number;
+  tables_occupied: number;
+  payment_success_rate: number;
+}
+
+export interface DetailedReport {
+  summary: DailyReportSummary;
+  orders: OrderWithDetails[];
+  waiters: WaiterSummary[];
+  categories: CategorySummary[];
 }

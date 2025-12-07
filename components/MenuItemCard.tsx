@@ -1,4 +1,6 @@
+import { useTheme } from '@/context/ThemeContext';
 import { MenuItem } from '@/lib/types';
+import { useMemo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 interface Props {
@@ -7,6 +9,9 @@ interface Props {
 }
 
 export default function MenuItemCard({ item, onPress }: Props) {
+  const { theme } = useTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
+
   return (
     <Pressable
       style={[styles.card, !item.available && styles.unavailable]}
@@ -25,6 +30,52 @@ export default function MenuItemCard({ item, onPress }: Props) {
       )}
     </Pressable>
   );
+}
+
+function createStyles(theme: any) {
+  const c = theme.colors;
+  return StyleSheet.create({
+    card: {
+      backgroundColor: c.card,
+      padding: 16,
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: c.border,
+    },
+    unavailable: {
+      opacity: 0.5,
+    },
+    header: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 8,
+    },
+    name: {
+      fontSize: 16,
+      fontWeight: '600',
+      color: c.text,
+      flex: 1,
+    },
+    category: {
+      fontSize: 12,
+      color: c.muted,
+      backgroundColor: c.input,
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      borderRadius: 6,
+    },
+    price: {
+      fontSize: 18,
+      fontWeight: '700',
+      color: c.success,
+    },
+    unavailableText: {
+      fontSize: 12,
+      color: c.danger,
+      marginTop: 4,
+    },
+  });
 }
 
 const styles = StyleSheet.create({

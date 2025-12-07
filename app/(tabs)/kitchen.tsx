@@ -1,16 +1,20 @@
 import Screen from '@/components/Screen';
+import { useTheme } from '@/context/ThemeContext';
 import { supabase } from '@/lib/supabase';
 import { Ionicons } from '@expo/vector-icons';
-import React, { useEffect, useState } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useFocusEffect } from '@react-navigation/native';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-    Alert,
-    Animated,
-    FlatList,
-    Pressable,
-    RefreshControl,
-    StyleSheet,
-    Text,
-    View,
+  Alert,
+  Animated,
+  FlatList,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
 } from 'react-native';
 
 type OrderStatus = 'pending' | 'preparing' | 'ready' | 'served';
@@ -40,15 +44,105 @@ interface GroupedOrder {
   table_name: string;
   seat_number: number;
   waiter_id?: string;
+  waiter_name?: string;
   items: KitchenOrder[];
 }
 
+const KITCHEN_ORDERS_CACHE_KEY = 'kitchen-orders-cache-v1';
+
 export default function KitchenScreen() {
+  const { theme } = useTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
   const [orders, setOrders] = useState<KitchenOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedFilter, setSelectedFilter] = useState<OrderStatus | 'all'>('all');
+  const [waiters, setWaiters] = useState<{ id: string; name: string }[]>([]);
+  const [selectedWaiter, setSelectedWaiter] = useState<string | 'all'>('all');
   const scaleAnimation = React.useRef(new Animated.Value(1)).current;
+
+  const fetchOrders = useCallback(async () => {
+    try {
+      // Only show loading spinner if we have nothing in state yet
+      setLoading((prev) => (orders.length === 0 ? true : prev));
+      
+      // Fetch guest orders
+      const { data: ordersData, error: ordersError } = await supabase
+        .from('guest_orders')
+        .select(`
+          id,
+          guest_id,
+          menu_item_id,
+          menu_item_name,
+          quantity,
+          price_snapshot,
+          status,
+          guests:guest_id (
+            guest_name,
+            seat_number,
+            table_id,
+            status,
+            tables:table_id (
+              name,
+              waiter_id
+            )
+          )
+        `)
+        .neq('status', 'served');
+
+      if (ordersError) throw ordersError;
+
+      // Fetch all menu items to get categories
+      const { data: menuData, error: menuError } = await supabase
+        .from('menu_items')
+        .select('id, category');
+
+      if (menuError) throw menuError;
+
+      // Create a map of menu_item_id to category
+      const categoryMap = new Map();
+      (menuData || []).forEach((item: any) => {
+        categoryMap.set(item.id, item.category);
+      });
+
+      const waiterMap = new Map(waiters.map((w) => [w.id, w.name]));
+
+      // Transform and enrich the orders with category
+      const transformedData = (ordersData || []).map((order: any) => {
+        const guest = Array.isArray(order.guests) ? order.guests[0] : order.guests;
+        const waiterId = guest?.tables?.waiter_id;
+        return {
+          ...order,
+          guest,
+          waiter_id: waiterId,
+          waiter_name: waiterId ? waiterMap.get(waiterId) : undefined,
+          category: categoryMap.get(order.menu_item_id),
+        };
+      });
+
+      // Filter out orders for guests who are already done/paid
+      const activeOrders = transformedData.filter((order: any) => {
+        const gStatus = order.guest?.status;
+        return !['paid', 'pending_payment', 'served', 'cleared'].includes(gStatus as string);
+      });
+
+      setOrders(activeOrders);
+      await AsyncStorage.setItem(KITCHEN_ORDERS_CACHE_KEY, JSON.stringify(activeOrders));
+    } catch (err) {
+      console.warn('Failed to fetch kitchen orders, using existing data', err);
+      // On failure, try to reuse cached data if available
+      try {
+        const cached = await AsyncStorage.getItem(KITCHEN_ORDERS_CACHE_KEY);
+        if (cached) {
+          setOrders(JSON.parse(cached));
+        }
+      } catch (cacheErr) {
+        console.warn('Failed to load cached kitchen orders after fetch error', cacheErr);
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, [orders.length]);
 
   useEffect(() => {
     // Start breathing animation
@@ -77,16 +171,25 @@ export default function KitchenScreen() {
   }, [loading]);
 
   useEffect(() => {
+    hydrateFromCache();
     fetchOrders();
+
+    supabase
+      .from('staff_profiles')
+      .select('id, name')
+      .order('name')
+      .then(({ data }) => {
+        if (data) setWaiters(data);
+      });
 
     // Subscribe to real-time updates from guest_orders
     const channel = supabase
       .channel('kitchen-orders-realtime')
       .on(
         'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'guest_orders' },
-        (payload) => {
-          // Refetch orders when any status changes
+        { event: '*', schema: 'public', table: 'guest_orders' },
+        () => {
+          // Refetch when new orders arrive or statuses change
           fetchOrders();
         }
       )
@@ -95,61 +198,30 @@ export default function KitchenScreen() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [fetchOrders]);
 
-  async function fetchOrders() {
+  useFocusEffect(
+    useCallback(() => {
+      fetchOrders();
+    }, [fetchOrders])
+  );
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      fetchOrders();
+    }, 60000);
+    return () => clearInterval(id);
+  }, [fetchOrders]);
+
+  async function hydrateFromCache() {
     try {
-      setLoading(true);
-      
-      // Fetch guest orders
-      const { data: ordersData, error: ordersError } = await supabase
-        .from('guest_orders')
-        .select(`
-          id,
-          guest_id,
-          menu_item_id,
-          menu_item_name,
-          quantity,
-          price_snapshot,
-          status,
-          guests:guest_id (
-            guest_name,
-            seat_number,
-            table_id,
-            tables:table_id (
-              name
-            )
-          )
-        `)
-        .neq('status', 'served');
-
-      if (ordersError) throw ordersError;
-
-      // Fetch all menu items to get categories
-      const { data: menuData, error: menuError } = await supabase
-        .from('menu_items')
-        .select('id, category');
-
-      if (menuError) throw menuError;
-
-      // Create a map of menu_item_id to category
-      const categoryMap = new Map();
-      (menuData || []).forEach((item: any) => {
-        categoryMap.set(item.id, item.category);
-      });
-
-      // Transform and enrich the orders with category
-      const transformedData = (ordersData || []).map((order: any) => ({
-        ...order,
-        guest: Array.isArray(order.guests) ? order.guests[0] : order.guests,
-        category: categoryMap.get(order.menu_item_id),
-      }));
-
-      setOrders(transformedData);
+      const cached = await AsyncStorage.getItem(KITCHEN_ORDERS_CACHE_KEY);
+      if (cached) {
+        setOrders(JSON.parse(cached));
+        setLoading(false);
+      }
     } catch (err) {
-      console.error('Failed to fetch kitchen orders:', err);
-    } finally {
-      setLoading(false);
+      console.warn('Failed to hydrate kitchen cache', err);
     }
   }
 
@@ -250,13 +322,19 @@ export default function KitchenScreen() {
         guest_name: firstItem.guest?.guest_name || 'Unknown Guest',
         table_name: firstItem.guest?.tables?.name || 'Unknown Table',
         seat_number: firstItem.guest?.seat_number || 0,
+        waiter_id: firstItem.waiter_id,
+        waiter_name: firstItem.waiter_name,
         items,
       };
     });
 
     // Apply filter
-    if (selectedFilter === 'all') return groupedArray;
-    return groupedArray.filter((order) => order.items.some((item) => item.status === selectedFilter));
+    const statusFiltered = selectedFilter === 'all'
+      ? groupedArray
+      : groupedArray.filter((order) => order.items.some((item) => item.status === selectedFilter));
+
+    if (selectedWaiter === 'all') return statusFiltered;
+    return statusFiltered.filter((order) => order.waiter_id === selectedWaiter);
   }
 
   function getCourseColor(category: string | undefined) {
@@ -354,6 +432,12 @@ export default function KitchenScreen() {
             <Text style={styles.tableName}>{item.table_name}</Text>
             <Text style={styles.seatNumber}>Seat {item.seat_number} • {item.guest_name}</Text>
           </View>
+          {item.waiter_name && (
+            <View style={styles.waiterPill}>
+              <Ionicons name="person" size={14} color="#0ea5e9" />
+              <Text style={styles.waiterPillText}>{item.waiter_name}</Text>
+            </View>
+          )}
         </View>
 
         {/* Grouped Course Items */}
@@ -530,6 +614,37 @@ export default function KitchenScreen() {
         </Pressable>
       </View>
 
+      {/* Waiter Filter */}
+      {waiters.length > 0 && (
+        <View style={styles.waiterFilterContainer}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.waiterScroll}
+          >
+            <Pressable
+              style={[styles.waiterChip, selectedWaiter === 'all' && styles.waiterChipActive]}
+              onPress={() => setSelectedWaiter('all')}
+            >
+              <Text style={[styles.waiterChipText, selectedWaiter === 'all' && styles.waiterChipTextActive]}>
+                All Waiters
+              </Text>
+            </Pressable>
+            {waiters.map((waiter) => (
+              <Pressable
+                key={waiter.id}
+                style={[styles.waiterChip, selectedWaiter === waiter.id && styles.waiterChipActive]}
+                onPress={() => setSelectedWaiter(waiter.id)}
+              >
+                <Text style={[styles.waiterChipText, selectedWaiter === waiter.id && styles.waiterChipTextActive]}>
+                  {waiter.name}
+                </Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+        </View>
+      )}
+
       {/* Orders List */}
       {filteredOrders.length === 0 ? (
         <View style={styles.emptyContainer}>
@@ -552,6 +667,321 @@ export default function KitchenScreen() {
       )}
     </Screen>
   );
+}
+
+function createStyles(theme: any) {
+  const c = theme.colors;
+  return StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: c.background,
+    },
+    loadingContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    loadingIconWrapper: {
+      marginBottom: 20,
+    },
+    loadingText: {
+      marginTop: 12,
+      fontSize: 16,
+      color: c.muted,
+    },
+    header: {
+      backgroundColor: c.card,
+      paddingHorizontal: 20,
+      paddingVertical: 16,
+      borderBottomWidth: 1,
+      borderBottomColor: c.border,
+    },
+    headerTitle: {
+      fontSize: 32,
+      fontWeight: '800',
+      color: c.text,
+      letterSpacing: -0.5,
+      marginBottom: 4,
+    },
+    headerSubtitle: {
+      fontSize: 14,
+      color: c.muted,
+      fontWeight: '500',
+    },
+    filterContainer: {
+      flexDirection: 'row',
+      backgroundColor: c.card,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      gap: 8,
+      borderBottomWidth: 1,
+      borderBottomColor: c.border,
+    },
+    filterTab: {
+      flex: 1,
+      paddingVertical: 8,
+      paddingHorizontal: 12,
+      borderRadius: 8,
+      backgroundColor: c.input,
+      alignItems: 'center',
+    },
+    filterTabActive: {
+      backgroundColor: c.primary,
+    },
+    filterText: {
+      fontSize: 12,
+      fontWeight: '600',
+      color: c.muted,
+    },
+    filterTextActive: {
+      color: '#fff',
+    },
+    waiterFilterContainer: {
+      backgroundColor: c.card,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      borderBottomWidth: 1,
+      borderBottomColor: c.border,
+    },
+    waiterScroll: {
+      gap: 8,
+    },
+    waiterChip: {
+      paddingVertical: 8,
+      paddingHorizontal: 12,
+      borderRadius: 16,
+      backgroundColor: c.input,
+      borderWidth: 1,
+      borderColor: c.border,
+      marginRight: 8,
+    },
+    waiterChipActive: {
+      backgroundColor: c.primary,
+      borderColor: c.primary,
+    },
+    waiterChipText: {
+      fontSize: 12,
+      fontWeight: '600',
+      color: c.text,
+    },
+    waiterChipTextActive: {
+      color: '#fff',
+    },
+    waiterPill: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: c.input,
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+      borderRadius: 12,
+      gap: 6,
+    },
+    waiterPillText: {
+      fontSize: 12,
+      fontWeight: '700',
+      color: c.primary,
+    },
+    listContent: {
+      padding: 12,
+      paddingBottom: 24,
+    },
+    orderCard: {
+      backgroundColor: c.card,
+      borderRadius: 12,
+      padding: 14,
+      marginBottom: 12,
+      borderWidth: 1,
+      borderColor: c.border,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: theme.isDark ? 0.1 : 0.05,
+      shadowRadius: 2,
+      elevation: theme.isDark ? 0 : 2,
+    },
+    orderHeader: {
+      marginBottom: 14,
+      paddingBottom: 12,
+      borderBottomWidth: 1,
+      borderBottomColor: c.border,
+    },
+    tableInfo: {
+      flex: 1,
+    },
+    tableName: {
+      fontSize: 16,
+      fontWeight: '700',
+      color: c.text,
+      marginBottom: 2,
+    },
+    seatNumber: {
+      fontSize: 12,
+      color: c.muted,
+    },
+    coursesContainer: {
+      gap: 10,
+      marginBottom: 12,
+    },
+    courseItem: {
+      backgroundColor: c.input,
+      borderRadius: 10,
+      padding: 12,
+      borderLeftWidth: 3,
+      borderLeftColor: c.border,
+    },
+    courseHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+    },
+    courseInfo: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+    },
+    courseBadge: {
+      width: 32,
+      height: 32,
+      borderRadius: 8,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    courseDetails: {
+      flex: 1,
+    },
+    courseName: {
+      fontSize: 13,
+      fontWeight: '700',
+      color: c.text,
+      marginBottom: 2,
+    },
+    courseStatus: {
+      fontSize: 11,
+      color: c.muted,
+      fontStyle: 'italic',
+    },
+    courseItemDisabled: {
+      opacity: 0.6,
+    },
+    statusContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 6,
+      paddingHorizontal: 10,
+      borderRadius: 8,
+      gap: 6,
+    },
+    statusDot: {
+      width: 10,
+      height: 10,
+      borderRadius: 5,
+    },
+    statusLabel: {
+      fontSize: 12,
+      fontWeight: '600',
+      color: c.text,
+    },
+    dishesContainer: {
+      marginTop: 10,
+      paddingTop: 10,
+      borderTopWidth: 1,
+      borderTopColor: c.border,
+      gap: 8,
+    },
+    dishItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+    },
+    dishQuantity: {
+      fontSize: 12,
+      fontWeight: '700',
+      color: c.primary,
+      minWidth: 32,
+    },
+    dishName: {
+      fontSize: 12,
+      color: c.subtext,
+      flex: 1,
+    },
+    itemName: {
+      fontSize: 12,
+      color: c.muted,
+    },
+    orderFooter: {
+      gap: 8,
+    },
+    courseActionButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 10,
+      paddingHorizontal: 12,
+      borderRadius: 8,
+      gap: 6,
+    },
+    courseActionText: {
+      fontSize: 13,
+      fontWeight: '700',
+      color: '#fff',
+    },
+    statusBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+      borderRadius: 12,
+      gap: 4,
+    },
+    statusText: {
+      fontSize: 10,
+      fontWeight: '700',
+      color: '#fff',
+    },
+    itemRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+    },
+    itemQuantity: {
+      fontSize: 18,
+      fontWeight: '800',
+      color: c.primary,
+      minWidth: 40,
+    },
+    actionButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 10,
+      borderRadius: 8,
+      gap: 6,
+    },
+    actionButtonText: {
+      fontSize: 14,
+      fontWeight: '700',
+      color: '#fff',
+    },
+    emptyContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      paddingHorizontal: 20,
+    },
+    emptyText: {
+      fontSize: 18,
+      fontWeight: '700',
+      color: c.text,
+      marginTop: 16,
+      textAlign: 'center',
+    },
+    emptySubtext: {
+      fontSize: 14,
+      color: c.muted,
+      marginTop: 8,
+      textAlign: 'center',
+    },
+  });
 }
 
 const styles = StyleSheet.create({
@@ -618,6 +1048,51 @@ const styles = StyleSheet.create({
   },
   filterTextActive: {
     color: '#fff',
+  },
+  waiterFilterContainer: {
+    backgroundColor: '#fff',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e7ff',
+  },
+  waiterScroll: {
+    gap: 8,
+  },
+  waiterChip: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 16,
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    marginRight: 8,
+  },
+  waiterChipActive: {
+    backgroundColor: '#0ea5e9',
+    borderColor: '#0ea5e9',
+  },
+  waiterChipText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#0f172a',
+  },
+  waiterChipTextActive: {
+    color: '#fff',
+  },
+  waiterPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#e0f2fe',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 12,
+    gap: 6,
+  },
+  waiterPillText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#0ea5e9',
   },
   listContent: {
     padding: 12,

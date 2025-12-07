@@ -1,4 +1,5 @@
 import Screen from '@/components/Screen';
+import { showToast } from '@/components/Toast';
 import { supabase } from '@/lib/supabase';
 import { MenuItem } from '@/lib/types';
 import { Ionicons } from '@expo/vector-icons';
@@ -165,12 +166,11 @@ export default function OrderTakingScreen({ guestId, onClose }: OrderTakingScree
         console.error('Failed to update guest status:', guestError);
       }
 
-      Alert.alert('Success', 'Items added to order', [
-        { text: 'OK', onPress: onClose }
-      ]);
+      showToast('Success! Items added to order.', 'success', 3500, 'card');
+      onClose();
     } catch (err: any) {
       console.error('Failed to add items to order:', err);
-      Alert.alert('Error', 'Failed to add items to order');
+      showToast('Failed to add items to order', 'error', 3500, 'card');
     }
   }
 

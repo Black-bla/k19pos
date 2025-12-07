@@ -1,7 +1,9 @@
+import { useTheme } from '@/context/ThemeContext';
 import { GuestWithOrders } from '@/hooks/useGuestsWithOrders';
 import { mapGuestStatusToBadge } from '@/lib/statusMap';
 import { GuestOrder } from '@/lib/types';
 import { Ionicons } from '@expo/vector-icons';
+import { useMemo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import StatusBadge from './StatusBadge';
 
@@ -11,6 +13,8 @@ interface Props {
 }
 
 export default function GuestCard({ guest, orders = [] }: Props) {
+  const { theme } = useTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
   const hasOrders = orders.length > 0;
   const totalAmount = orders.reduce((sum, order) => sum + (order.price_snapshot * order.quantity), 0);
 
@@ -23,6 +27,12 @@ export default function GuestCard({ guest, orders = [] }: Props) {
             <Text style={styles.metaText}>Seat {guest.seat_number}</Text>
             <Text style={styles.metaDot}>•</Text>
             <Text style={styles.metaText}>{guest.table_name || guest.table_id}</Text>
+            {guest.waiter_name && (
+              <>
+                <Text style={styles.metaDot}>•</Text>
+                <Text style={styles.metaText}>Waiter: {guest.waiter_name}</Text>
+              </>
+            )}
           </View>
         </View>
         <StatusBadge status={mapGuestStatusToBadge(guest.status)} label={guest.status} />
@@ -49,7 +59,7 @@ export default function GuestCard({ guest, orders = [] }: Props) {
           </View>
         ) : (
           <View style={styles.noOrdersContainer}>
-            <Ionicons name="document-text-outline" size={32} color="#cbd5e1" />
+            <Ionicons name="document-text-outline" size={32} color={styles.noOrdersIcon.color} />
             <Text style={styles.noOrdersText}>No items ordered yet</Text>
           </View>
         )}
@@ -58,14 +68,12 @@ export default function GuestCard({ guest, orders = [] }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const baseStyles = StyleSheet.create({
   card: {
-    backgroundColor: '#fff',
     borderRadius: 14,
     padding: 16,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
@@ -79,7 +87,6 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     paddingBottom: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
   },
   guestInfo: {
     flex: 1,
@@ -88,7 +95,6 @@ const styles = StyleSheet.create({
   guestName: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#0f172a',
     marginBottom: 6,
   },
   meta: {
@@ -98,22 +104,18 @@ const styles = StyleSheet.create({
   },
   metaText: {
     fontSize: 13,
-    color: '#64748b',
     fontWeight: '500',
   },
   metaDot: {
     fontSize: 12,
-    color: '#cbd5e1',
   },
   ordersSection: {
     marginTop: 12,
   },
   ordersList: {
     padding: 12,
-    backgroundColor: '#f8fafc',
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
   },
   orderItem: {
     flexDirection: 'row',
@@ -123,13 +125,11 @@ const styles = StyleSheet.create({
   },
   orderItemName: {
     fontSize: 13,
-    color: '#475569',
     flex: 1,
   },
   orderItemPrice: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#0f172a',
   },
   orderTotal: {
     flexDirection: 'row',
@@ -138,12 +138,10 @@ const styles = StyleSheet.create({
     marginTop: 8,
     paddingTop: 8,
     borderTopWidth: 1,
-    borderTopColor: '#cbd5e1',
   },
   orderTotalLabel: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#0f172a',
   },
   orderTotalAmount: {
     fontSize: 14,
@@ -157,7 +155,72 @@ const styles = StyleSheet.create({
   },
   noOrdersText: {
     fontSize: 14,
-    color: '#94a3b8',
     marginTop: 8,
   },
 });
+
+function createStyles(theme: any) {
+  const c = theme.colors;
+
+  return StyleSheet.create({
+    ...baseStyles,
+    card: {
+      ...baseStyles.card,
+      backgroundColor: c.card,
+      borderColor: c.border,
+    },
+    header: {
+      ...baseStyles.header,
+      borderBottomColor: c.border,
+    },
+    guestInfo: baseStyles.guestInfo,
+    guestName: {
+      ...baseStyles.guestName,
+      color: c.text,
+    },
+    meta: baseStyles.meta,
+    metaText: {
+      ...baseStyles.metaText,
+      color: c.subtext,
+    },
+    metaDot: {
+      ...baseStyles.metaDot,
+      color: c.border,
+    },
+    ordersSection: baseStyles.ordersSection,
+    ordersList: {
+      ...baseStyles.ordersList,
+      backgroundColor: c.input,
+      borderColor: c.border,
+    },
+    orderItem: baseStyles.orderItem,
+    orderItemName: {
+      ...baseStyles.orderItemName,
+      color: c.text,
+    },
+    orderItemPrice: {
+      ...baseStyles.orderItemPrice,
+      color: c.text,
+    },
+    orderTotal: {
+      ...baseStyles.orderTotal,
+      borderTopColor: c.border,
+    },
+    orderTotalLabel: {
+      ...baseStyles.orderTotalLabel,
+      color: c.text,
+    },
+    orderTotalAmount: {
+      ...baseStyles.orderTotalAmount,
+      color: c.success,
+    },
+    noOrdersContainer: baseStyles.noOrdersContainer,
+    noOrdersText: {
+      ...baseStyles.noOrdersText,
+      color: c.subtext,
+    },
+    noOrdersIcon: {
+      color: c.muted,
+    },
+  });
+}

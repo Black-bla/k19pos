@@ -1,9 +1,12 @@
+import { useTheme } from '@/context/ThemeContext';
 import { supabase } from "@/lib/supabase";
 import { router, useLocalSearchParams } from "expo-router";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 
 export default function PaymentScreen() {
+  const { theme } = useTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
   const { orderId } = useLocalSearchParams();
   const [phone, setPhone] = useState("");
   const [loading, setLoading] = useState(false);
@@ -59,6 +62,77 @@ export default function PaymentScreen() {
       )}
     </View>
   );
+}
+
+function createStyles(theme: any) {
+  const c = theme.colors;
+  return StyleSheet.create({
+    container: {
+      flex: 1,
+      justifyContent: "center",
+      alignItems: "center",
+      padding: 24,
+      backgroundColor: c.background,
+    },
+    title: {
+      fontSize: 28,
+      fontWeight: "700",
+      marginBottom: 32,
+      color: c.text,
+    },
+    input: {
+      width: "100%",
+      maxWidth: 320,
+      padding: 14,
+      borderRadius: 8,
+      backgroundColor: c.card,
+      marginBottom: 16,
+      fontSize: 16,
+      borderWidth: 1,
+      borderColor: c.border,
+    },
+    button: {
+      width: "100%",
+      maxWidth: 320,
+      backgroundColor: c.primary,
+      padding: 16,
+      borderRadius: 8,
+      alignItems: "center",
+      marginBottom: 24,
+    },
+    buttonText: {
+      color: c.card,
+      fontSize: 18,
+      fontWeight: "700",
+    },
+    result: {
+      alignItems: "center",
+      marginTop: 24,
+    },
+    success: {
+      color: c.success,
+      fontSize: 18,
+      fontWeight: "700",
+      marginBottom: 8,
+    },
+    failed: {
+      color: c.danger,
+      fontSize: 18,
+      fontWeight: "700",
+      marginBottom: 8,
+    },
+    doneBtn: {
+      backgroundColor: c.success,
+      padding: 12,
+      borderRadius: 8,
+      marginTop: 16,
+    },
+    doneText: {
+      color: c.card,
+      fontSize: 16,
+      fontWeight: "700",
+    },
+  });
 }
 
 const styles = StyleSheet.create({

@@ -5,6 +5,8 @@ import { useEffect, useState } from 'react';
 export interface GuestWithOrders extends Guest {
   orders: GuestOrder[];
   table_name?: string;
+  waiter_id?: string | null;
+  waiter_name?: string;
 }
 
 export function useGuestsWithOrders() {
@@ -25,13 +27,22 @@ export function useGuestsWithOrders() {
 
   async function fetchGuests() {
     try {
-      // Fetch all guests with table info
-      const { data: guestsData, error: guestsError } = await supabase
-        .from('guests')
-        .select('*, tables(name)')
-        .order('created_at', { ascending: false });
+      const [{ data: guestsData, error: guestsError }, { data: ordersData, error: ordersError }, { data: waitersData, error: waitersError }] = await Promise.all([
+        supabase
+          .from('guests')
+          .select('*, tables(name, waiter_id)')
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('guest_orders')
+          .select('*'),
+        supabase
+          .from('staff_profiles')
+          .select('id, name'),
+      ]);
 
       if (guestsError) throw guestsError;
+      if (ordersError) throw ordersError;
+      if (waitersError) throw waitersError;
 
       if (!guestsData) {
         setGuests([]);
@@ -39,19 +50,22 @@ export function useGuestsWithOrders() {
         return;
       }
 
-      // Fetch all guest orders
-      const { data: ordersData, error: ordersError } = await supabase
-        .from('guest_orders')
-        .select('*');
+      const waiterMap = new Map<string, string>();
+      (waitersData || []).forEach((w: any) => waiterMap.set(w.id, w.name));
 
-      if (ordersError) throw ordersError;
+      const guestsWithOrders: GuestWithOrders[] = guestsData.map((guest: any) => {
+        const ordersForGuest = ordersData?.filter((o: any) => o.guest_id === guest.id) || [];
+        const waiterId = guest.tables?.waiter_id ?? null;
+        const waiterName = waiterId ? waiterMap.get(waiterId) : undefined;
 
-      // Map orders to guests
-      const guestsWithOrders: GuestWithOrders[] = guestsData.map((guest: any) => ({
-        ...guest,
-        table_name: guest.tables?.name || guest.table_id,
-        orders: ordersData?.filter(o => o.guest_id === guest.id) || [],
-      }));
+        return {
+          ...guest,
+          waiter_id: waiterId,
+          waiter_name: waiterName,
+          table_name: guest.tables?.name || guest.table_id,
+          orders: ordersForGuest,
+        };
+      });
 
       setGuests(guestsWithOrders);
     } catch (err) {
