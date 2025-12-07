@@ -26,6 +26,7 @@ export default function UsersScreen() {
   const [newRole, setNewRole] = useState('staff');
   const [creating, setCreating] = useState(false);
   const [selectedAvatar, setSelectedAvatar] = useState<{ url: string; name: string } | null>(null);
+  const [viewUser, setViewUser] = useState<StaffProfile | null>(null);
 
   useEffect(() => {
     fetchUsers();
@@ -232,7 +233,7 @@ export default function UsersScreen() {
             data={users}
             keyExtractor={(i) => i.id}
             renderItem={({ item }) => (
-              <View style={styles.row}>
+              <Pressable style={styles.row} onPress={() => setViewUser(item)}>
                 <Pressable onPress={() => item.avatar_url && setSelectedAvatar({ url: item.avatar_url, name: item.name || item.id })}>
                   {item.avatar_url ? (
                     <Image source={{ uri: item.avatar_url }} style={[styles.avatar, item.role === 'admin' ? styles.adminAvatar : null]} />
@@ -247,21 +248,21 @@ export default function UsersScreen() {
 
                 <View style={{ flexDirection: 'row', gap: 8 }}>
                     <Pressable
-                      style={[styles.roleBtn, { backgroundColor: item.role === 'manager' ? '#fde68a' : '#f3f4f6' }]}
+                      style={[styles.roleBtn, item.role === 'manager' ? styles.roleBtnSelected : styles.roleBtnUnselected]}
                       onPress={() => changeRole(item, 'manager')}
                       disabled={updatingId === item.id || item.role === 'admin'}
                     >
-                      <Text style={styles.roleText}>Manager</Text>
+                      <Text style={[styles.roleText, item.role === 'manager' ? styles.roleTextSelected : null]}>Manager</Text>
                     </Pressable>
                     <Pressable
-                      style={[styles.roleBtn, { backgroundColor: item.role === 'chef' ? '#fcd34d' : '#f3f4f6' }]}
+                      style={[styles.roleBtn, item.role === 'chef' ? styles.roleBtnSelected : styles.roleBtnUnselected]}
                       onPress={() => changeRole(item, 'chef')}
                       disabled={updatingId === item.id || item.role === 'admin'}
                     >
-                      <Text style={styles.roleText}>Chef</Text>
+                      <Text style={[styles.roleText, item.role === 'chef' ? styles.roleTextSelected : null]}>Chef</Text>
                     </Pressable>
                 </View>
-              </View>
+              </Pressable>
             )}
           />
         )}
@@ -309,22 +310,22 @@ export default function UsersScreen() {
               <Text style={styles.label}>Role:</Text>
               <View style={{ flexDirection: 'row', gap: 8 }}>
                 <Pressable
-                  style={[styles.roleBtn, { backgroundColor: newRole === 'staff' ? '#10b981' : '#f3f4f6' }]}
+                  style={[styles.roleBtn, newRole === 'staff' ? styles.roleBtnSelected : styles.roleBtnUnselected]}
                   onPress={() => setNewRole('staff')}
                 >
-                  <Text style={[styles.roleText, { color: newRole === 'staff' ? '#fff' : '#111827' }]}>Staff</Text>
+                  <Text style={[styles.roleText, newRole === 'staff' ? styles.roleTextSelected : null]}>Staff</Text>
                 </Pressable>
                 <Pressable
-                  style={[styles.roleBtn, { backgroundColor: newRole === 'chef' ? '#fcd34d' : '#f3f4f6' }]}
+                  style={[styles.roleBtn, newRole === 'chef' ? styles.roleBtnSelected : styles.roleBtnUnselected]}
                   onPress={() => setNewRole('chef')}
                 >
-                  <Text style={styles.roleText}>Chef</Text>
+                  <Text style={[styles.roleText, newRole === 'chef' ? styles.roleTextSelected : null]}>Chef</Text>
                 </Pressable>
                 <Pressable
-                  style={[styles.roleBtn, { backgroundColor: newRole === 'manager' ? '#fde68a' : '#f3f4f6' }]}
+                  style={[styles.roleBtn, newRole === 'manager' ? styles.roleBtnSelected : styles.roleBtnUnselected]}
                   onPress={() => setNewRole('manager')}
                 >
-                  <Text style={styles.roleText}>Manager</Text>
+                  <Text style={[styles.roleText, newRole === 'manager' ? styles.roleTextSelected : null]}>Manager</Text>
                 </Pressable>
               </View>
             </View>
@@ -357,6 +358,48 @@ export default function UsersScreen() {
           </View>
         </Pressable>
       </Modal>
+
+      {/* User Detail Modal */}
+      <Modal visible={viewUser !== null} transparent animationType="fade" onRequestClose={() => setViewUser(null)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.viewModalBox}>
+            <View style={styles.viewModalHeader}>
+              <Text style={styles.viewModalTitle}>User Details</Text>
+              <Pressable style={styles.viewClose} onPress={() => setViewUser(null)}>
+                <Text style={styles.viewCloseText}>✕</Text>
+              </Pressable>
+            </View>
+
+            {viewUser && (
+              <View style={{ gap: 14 }}>
+                <View style={{ alignItems: 'center', gap: 10 }}>
+                  {viewUser.avatar_url ? (
+                    <Image source={{ uri: viewUser.avatar_url }} style={styles.viewAvatar} />
+                  ) : (
+                    <View style={styles.viewAvatarPlaceholder}>
+                      <Text style={styles.viewAvatarInitials}>{(viewUser.name || viewUser.id).slice(0,2).toUpperCase()}</Text>
+                    </View>
+                  )}
+                  <View style={styles.viewRoleChip}><Text style={styles.viewRoleChipText}>{viewUser.role?.toUpperCase()}</Text></View>
+                </View>
+
+                <View style={styles.viewFieldRow}>
+                  <Text style={styles.viewLabel}>Name</Text>
+                  <Text style={styles.viewValue}>{viewUser.name || 'N/A'}</Text>
+                </View>
+                <View style={styles.viewFieldRow}>
+                  <Text style={styles.viewLabel}>Phone</Text>
+                  <Text style={styles.viewValue}>{viewUser.phone || 'N/A'}</Text>
+                </View>
+                <View style={styles.viewFieldRow}>
+                  <Text style={styles.viewLabel}>User ID</Text>
+                  <Text style={styles.viewValue}>{viewUser.id}</Text>
+                </View>
+              </View>
+            )}
+          </View>
+        </View>
+      </Modal>
     </Screen>
   );
 }
@@ -370,15 +413,18 @@ function createStyles(theme: any) {
     backButtonPlaceholder: { width: 40 },
     title: { fontSize: 22, fontWeight: '700', color: c.text, flex: 1, textAlign: 'center' },
     center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-    row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 8, borderBottomWidth: 1, borderBottomColor: c.border },
-    avatar: { width: 64, height: 64, borderRadius: 32 },
-    avatarPlaceholder: { width: 64, height: 64, borderRadius: 32, backgroundColor: c.border, alignItems: 'center', justifyContent: 'center' },
+    row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 12, borderWidth: 1, borderColor: c.border, borderRadius: 12, backgroundColor: c.card, marginBottom: 10 },
+    avatar: { width: 64, height: 64, borderRadius: 32, borderWidth: 1, borderColor: c.border },
+    avatarPlaceholder: { width: 64, height: 64, borderRadius: 32, backgroundColor: c.input, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: c.border },
     avatarInitials: { color: c.subtext, fontWeight: '700', fontSize: 16 },
     name: { fontSize: 16, fontWeight: '700', color: c.text },
     small: { color: c.muted, fontSize: 12 },
-    roleBtn: { paddingVertical: 8, paddingHorizontal: 14, borderRadius: 999, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: c.border, minWidth: 74 },
+    roleBtn: { paddingVertical: 8, paddingHorizontal: 14, borderRadius: 999, justifyContent: 'center', alignItems: 'center', borderWidth: 1, minWidth: 74 },
+    roleBtnSelected: { backgroundColor: c.primary, borderColor: c.primary },
+    roleBtnUnselected: { backgroundColor: c.input, borderColor: c.border },
     roleText: { fontWeight: '700', color: c.text },
-    adminAvatar: { borderWidth: 3, borderColor: c.text },
+    roleTextSelected: { color: '#fff' },
+    adminAvatar: { borderWidth: 2, borderColor: c.primary },
     addBtn: { backgroundColor: c.primary, paddingVertical: 12, paddingHorizontal: 16, borderRadius: 8, alignItems: 'center', marginBottom: 16 },
     addText: { color: '#fff', fontWeight: '700', fontSize: 16 },
     modalOverlay: { flex: 1, backgroundColor: c.overlay, justifyContent: 'center', alignItems: 'center' },
@@ -446,6 +492,19 @@ function createStyles(theme: any) {
       color: '#fff',
       fontWeight: '700',
     },
+    viewModalBox: { width: '90%', maxWidth: 420, backgroundColor: c.card, borderRadius: 16, padding: 24, gap: 12 },
+    viewModalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+    viewModalTitle: { fontSize: 18, fontWeight: '800', color: c.text },
+    viewClose: { width: 36, height: 36, borderRadius: 18, backgroundColor: c.input, alignItems: 'center', justifyContent: 'center' },
+    viewCloseText: { fontSize: 18, fontWeight: '800', color: c.text },
+    viewAvatar: { width: 120, height: 120, borderRadius: 60, borderWidth: 2, borderColor: c.border },
+    viewAvatarPlaceholder: { width: 120, height: 120, borderRadius: 60, backgroundColor: c.input, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: c.border },
+    viewAvatarInitials: { fontSize: 36, fontWeight: '800', color: c.subtext },
+    viewRoleChip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999, backgroundColor: c.primary },
+    viewRoleChipText: { color: '#fff', fontWeight: '700', letterSpacing: 0.5 },
+    viewFieldRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: c.border },
+    viewLabel: { color: c.muted, fontWeight: '600', fontSize: 14 },
+    viewValue: { color: c.text, fontWeight: '700', fontSize: 15 },
   });
 }
 
