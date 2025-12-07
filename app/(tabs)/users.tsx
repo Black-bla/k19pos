@@ -4,10 +4,13 @@ import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
 import { supabase } from '@/lib/supabase';
 import { StaffProfile } from '@/lib/types';
+import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, Image, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 export default function UsersScreen() {
+  const router = useRouter();
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
   const { staffProfile } = useAuth();
@@ -149,7 +152,11 @@ export default function UsersScreen() {
     return (
       <Screen style={styles.container}>
         <View style={styles.header}>
+          <Pressable onPress={() => router.push('/(tabs)/profile')} style={styles.backButton}>
+            <Ionicons name="chevron-back" size={24} color={theme.colors.primary} />
+          </Pressable>
           <Text style={styles.title}>Users</Text>
+          <View style={styles.backButtonPlaceholder} />
         </View>
         <View style={{ padding: 16, flex: 1 }}>
           {loading ? (
@@ -197,7 +204,11 @@ export default function UsersScreen() {
   return (
     <Screen style={styles.container}>
       <View style={styles.header}>
+        <Pressable onPress={() => router.push('/(tabs)/profile')} style={styles.backButton}>
+          <Ionicons name="chevron-back" size={24} color={theme.colors.primary} />
+        </Pressable>
         <Text style={styles.title}>Manage Users</Text>
+        <View style={styles.backButtonPlaceholder} />
       </View>
       <View style={{ padding: 16, flex: 1 }}>
         <Pressable style={styles.addBtn} onPress={() => setAddModalOpen(true)}>
@@ -354,8 +365,10 @@ function createStyles(theme: any) {
   const c = theme.colors;
   return StyleSheet.create({
     container: { flex: 1, backgroundColor: c.background },
-    header: { padding: 20, paddingTop: 60, backgroundColor: c.card, borderBottomWidth: 1, borderBottomColor: c.border },
-    title: { fontSize: 22, fontWeight: '700', color: c.text },
+    header: { padding: 20, paddingTop: 60, backgroundColor: c.card, borderBottomWidth: 1, borderBottomColor: c.border, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+    backButton: { width: 40, height: 40, borderRadius: 8, justifyContent: 'center', alignItems: 'center' },
+    backButtonPlaceholder: { width: 40 },
+    title: { fontSize: 22, fontWeight: '700', color: c.text, flex: 1, textAlign: 'center' },
     center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
     row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 8, borderBottomWidth: 1, borderBottomColor: c.border },
     avatar: { width: 64, height: 64, borderRadius: 32 },

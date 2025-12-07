@@ -4,6 +4,8 @@ import { useReporting } from '@/hooks/useReporting';
 import { CategorySummary, OrderWithDetails, WaiterSummary } from '@/lib/types';
 import { format, subDays } from 'date-fns';
 import * as Print from 'expo-print';
+import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -18,6 +20,7 @@ import {
 } from 'react-native';
 
 export default function DailyReportScreen() {
+  const router = useRouter();
   const { theme } = useTheme();
   const c = theme.colors;
   const { report, loading, error, fetchDailyReport } = useReporting();
@@ -259,7 +262,13 @@ export default function DailyReportScreen() {
     <Screen>
       <View style={[styles.container, { backgroundColor: c.background }]}>
         <View style={[styles.header, { backgroundColor: c.card, borderBottomColor: c.border }]}>
-          <Text style={[styles.title, { color: c.text }]}>Daily Report</Text>
+          <View style={styles.headerTop}>
+            <Pressable onPress={() => router.push('/(tabs)/profile')} style={styles.backButton}>
+              <Ionicons name="chevron-back" size={24} color={c.primary} />
+            </Pressable>
+            <Text style={[styles.title, { color: c.text }]}>Daily Report</Text>
+            <View style={styles.backButtonPlaceholder} />
+          </View>
 
           {/* Date Picker */}
           <View style={[styles.datePicker, { backgroundColor: c.input, borderColor: c.border }]}>
@@ -520,10 +529,27 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     borderBottomWidth: 1,
   },
+  headerTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  backButtonPlaceholder: {
+    width: 40,
+  },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    marginBottom: 12,
+    flex: 1,
+    textAlign: 'center',
   },
   datePicker: {
     flexDirection: 'row',

@@ -202,7 +202,13 @@ export default function MenuListScreen() {
   return (
     <Screen style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>All Menus</Text>
+        <View style={styles.headerTop}>
+          <Pressable onPress={() => router.push('/(tabs)/profile')} style={styles.backButton}>
+            <Ionicons name="chevron-back" size={24} color={theme.colors.primary} />
+          </Pressable>
+          <Text style={styles.title}>All Menus</Text>
+          <View style={styles.backButtonPlaceholder} />
+        </View>
         <View style={styles.headerButtons}>
           {canCreate && !userHasMenu ? (
             <>
@@ -364,14 +370,29 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderBottomWidth: 1,
     borderBottomColor: '#e2e8f0',
+  },
+  headerTop: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  backButtonPlaceholder: {
+    width: 40,
   },
   title: {
     fontSize: 24,
     fontWeight: '700',
     color: '#0f172a',
+    flex: 1,
+    textAlign: 'center',
   },
   headerButtons: {
     flexDirection: 'row',
