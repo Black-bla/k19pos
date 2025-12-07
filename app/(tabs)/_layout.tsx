@@ -25,8 +25,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="menu"
         options={{
-          title: "Menu",
-          tabBarIcon: ({ color }) => <Ionicons name="restaurant" size={24} color={color} />,
+          href: null,
         }}
       />
       <Tabs.Screen
@@ -52,8 +51,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="users"
         options={{
-          title: "Users",
-          tabBarIcon: ({ color }) => <Ionicons name="people-circle" size={24} color={color} />,
+          href: null,
         }}
       />
       <Tabs.Screen
@@ -66,8 +64,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="report"
         options={{
-          title: 'Report',
-          tabBarIcon: ({ color }) => <Ionicons name="bar-chart" size={24} color={color} />,
+          href: null,
         }}
       />
     </Tabs>

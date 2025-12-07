@@ -6,12 +6,14 @@ import { ThemePalette, useTheme } from '@/context/ThemeContext';
 import { lipana } from '@/lib/lipana';
 import { supabase } from '@/lib/supabase';
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
 import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Image, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 
 export default function ProfileScreen() {
+  const router = useRouter();
   const { user, staffProfile, signOut, refreshProfile } = useAuth();
   const { theme, preference, setPreference } = useTheme();
   const name = staffProfile?.name || user?.user_metadata?.full_name || user?.email || 'Unknown';
@@ -552,6 +554,46 @@ export default function ProfileScreen() {
         </View>
         </View>
 
+        {/* Quick Access Section */}
+        <View style={styles.card}>
+          <View style={styles.sectionHeader}>
+            <Ionicons name="grid" size={24} color="#2563eb" />
+            <Text style={styles.sectionTitle}>Quick Access</Text>
+          </View>
+
+          <View style={styles.quickAccessGrid}>
+            <Pressable
+              style={styles.quickAccessItem}
+              onPress={() => router.push('menu')}
+            >
+              <View style={[styles.quickAccessIcon, { backgroundColor: '#fee2e2' }]}>
+                <Ionicons name="restaurant" size={28} color="#dc2626" />
+              </View>
+              <Text style={styles.quickAccessLabel}>Menu</Text>
+            </Pressable>
+
+            <Pressable
+              style={styles.quickAccessItem}
+              onPress={() => router.push('users')}
+            >
+              <View style={[styles.quickAccessIcon, { backgroundColor: '#dbeafe' }]}>
+                <Ionicons name="people-circle" size={28} color="#0284c7" />
+              </View>
+              <Text style={styles.quickAccessLabel}>Users</Text>
+            </Pressable>
+
+            <Pressable
+              style={styles.quickAccessItem}
+              onPress={() => router.push('report')}
+            >
+              <View style={[styles.quickAccessIcon, { backgroundColor: '#f0fdf4' }]}>
+                <Ionicons name="bar-chart" size={28} color="#15803d" />
+              </View>
+              <Text style={styles.quickAccessLabel}>Reports</Text>
+            </Pressable>
+          </View>
+        </View>
+
         {/* Sign Out Section - At Bottom of Scroll */}
         <View style={styles.card}>
           <View style={styles.sectionHeader}>
@@ -735,5 +777,9 @@ function createStyles(theme: ThemePalette) {
     modalBulletRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
     bulletDot: { width: 8, height: 8, borderRadius: 999, backgroundColor: '#ef4444' },
     modalBulletText: { fontSize: 14, color: c.text, flex: 1, lineHeight: 20 },
+    quickAccessGrid: { flexDirection: 'row', justifyContent: 'space-around', width: '100%', gap: 12 },
+    quickAccessItem: { alignItems: 'center', flex: 1 },
+    quickAccessIcon: { width: 64, height: 64, borderRadius: 16, alignItems: 'center', justifyContent: 'center', marginBottom: 8 },
+    quickAccessLabel: { fontSize: 13, fontWeight: '600', color: c.text, textAlign: 'center' },
   });
 }
