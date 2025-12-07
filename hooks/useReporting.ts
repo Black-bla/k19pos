@@ -31,8 +31,7 @@ export const useReporting = () => {
             guest_name,
             table_id,
             waiter_id,
-            table:tables(name),
-            waiter:staff_profiles(name)
+            table:tables(name)
           ),
           menu_items(
             name,
@@ -46,6 +45,21 @@ export const useReporting = () => {
         .order('created_at', { ascending: true });
 
       if (ordersError) throw ordersError;
+
+      // 1b. Fetch all staff profiles to map waiter IDs to names
+      const { data: staffData, error: staffError } = await supabase
+        .from('staff_profiles')
+        .select('id, name');
+
+      if (staffError) throw staffError;
+
+      // Create a map of waiter IDs to names
+      const waiterNameMap = new Map<string, string>();
+      if (staffData) {
+        staffData.forEach((staff: any) => {
+          waiterNameMap.set(staff.id, staff.name || 'Unknown');
+        });
+      }
 
       // 2. Fetch all payments for the day
       const { data: paymentsData, error: paymentsError } = await supabase
@@ -83,14 +97,15 @@ export const useReporting = () => {
 
           const guest = order.guest;
           const table = guest?.table;
-          const waiter = guest?.waiter;
+          const waiter_id = guest?.waiter_id;
+          const waiter_name = waiter_id ? waiterNameMap.get(waiter_id) : null;
           const menuItem = order.menu_items?.[0];
 
           orders.push({
             guest_id: guest?.id || '',
             guest_name: guest?.guest_name || 'Unknown',
             table_name: table?.name || 'N/A',
-            waiter_name: waiter?.name || null,
+            waiter_name: waiter_name || null,
             menu_item_name: menuItem?.name || 'Unknown Item',
             quantity: order.quantity,
             price_snapshot: order.price_snapshot,
@@ -99,12 +114,13 @@ export const useReporting = () => {
           });
 
           // Track waiter sales
-          if (guest?.waiter_id && waiter) {
+          if (guest?.waiter_id) {
             const waiterId = guest.waiter_id;
+            const waiterName = waiterNameMap.get(waiterId) || 'Unknown';
             if (!waiterMap.has(waiterId)) {
               waiterMap.set(waiterId, {
                 waiter_id: waiterId,
-                waiter_name: waiter.name || 'Unknown',
+                waiter_name: waiterName,
                 order_count: 0,
                 total_sales: 0,
                 total_tips: 0,
