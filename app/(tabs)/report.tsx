@@ -232,22 +232,34 @@ export default function DailyReportScreen() {
         base64: false,
       });
       
-      // Use the device's Documents directory (platform-specific)
-      const documentsDir = FileSystem.documentDirectory;
-      const reportsDir = `${documentsDir}K19Reports/`;
+      // Check if documentDirectory is available, fallback to cacheDirectory
+      const baseDir = FileSystem.documentDirectory || FileSystem.cacheDirectory;
+      
+      if (!baseDir) {
+        throw new Error('No storage directory available');
+      }
+      
+      const reportsDir = `${baseDir}K19Reports/`;
+      
+      console.log('Base directory:', baseDir);
+      console.log('Reports directory:', reportsDir);
+      console.log('Source file:', result.uri);
       
       // Create directory using new API
       try {
         const dir = new FileSystem.Directory(reportsDir);
         await dir.create();
+        console.log('Directory created successfully');
       } catch (err) {
         // Directory might already exist, which is fine
-        console.log('Directory exists or created:', reportsDir);
+        console.log('Directory exists or error:', err);
       }
       
       // Create filename with date
       const filename = `Daily_Report_${selectedDate}.pdf`;
       const destinationUri = `${reportsDir}${filename}`;
+      
+      console.log('Destination URI:', destinationUri);
       
       // Move the file to the destination using new API
       const sourceFile = new FileSystem.File(result.uri);
