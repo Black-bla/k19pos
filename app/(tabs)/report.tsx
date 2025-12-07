@@ -260,7 +260,7 @@ export default function DailyReportScreen() {
 
   return (
     <Screen>
-      <View style={styles.container}>
+      <View style={[styles.container, { backgroundColor: c.background }]}>
         {/* Header */}
         <View style={[styles.header, { backgroundColor: c.card, borderBottomColor: c.border }]}>
           <Text style={[styles.title, { color: c.text }]}>Daily Report</Text>
@@ -330,7 +330,7 @@ export default function DailyReportScreen() {
 
         {/* Content */}
         {!loading && report && (
-          <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
+          <ScrollView style={[{ flex: 1, backgroundColor: c.background }]} showsVerticalScrollIndicator={false}>
             {/* Summary KPIs */}
             <View style={styles.kpiGrid}>
               <KPICard
@@ -387,21 +387,21 @@ export default function DailyReportScreen() {
             {report.waiters.length > 0 && (
               <View style={styles.section}>
                 <Text style={[styles.sectionTitle, { color: c.text }]}>Waiter Summary</Text>
-                <View style={[styles.table, { borderColor: c.border }]}>
-                  <View style={[styles.tableHeader, { backgroundColor: c.input }]}>
+                <View style={[styles.table, { borderColor: c.border, backgroundColor: c.card }]}>
+                  <View style={[styles.tableHeader, { backgroundColor: c.input, borderBottomColor: c.border, borderBottomWidth: 1 }]}>
                     <Text style={[styles.tableCell, styles.cellBold, { color: c.text, flex: 2 }]}>Waiter</Text>
                     <Text style={[styles.tableCell, styles.cellBold, { color: c.text, flex: 1 }]}>Orders</Text>
                     <Text style={[styles.tableCell, styles.cellBold, { color: c.text, flex: 1.5 }]}>Sales</Text>
                     <Text style={[styles.tableCell, styles.cellBold, { color: c.text, flex: 1.2 }]}>Avg</Text>
                   </View>
                   {report.waiters.map((waiter: WaiterSummary, idx: number) => (
-                    <View key={idx} style={[styles.tableRow, { borderTopColor: c.border }]}>
+                    <View key={idx} style={[styles.tableRow, { borderTopColor: c.border, backgroundColor: idx % 2 === 0 ? c.card : c.input }]}>
                       <Text style={[styles.tableCell, { color: c.text, flex: 2 }]}>{waiter.waiter_name}</Text>
-                      <Text style={[styles.tableCell, { color: c.text, flex: 1 }]}>{waiter.order_count}</Text>
+                      <Text style={[styles.tableCell, { color: c.subtext, flex: 1 }]}>{waiter.order_count}</Text>
                       <Text style={[styles.tableCell, { color: c.success, flex: 1.5, fontWeight: 'bold' }]}>
                         {waiter.total_sales.toFixed(0)}
                       </Text>
-                      <Text style={[styles.tableCell, { color: c.text, flex: 1.2 }]}>
+                      <Text style={[styles.tableCell, { color: c.subtext, flex: 1.2 }]}>
                         {waiter.avg_check_size.toFixed(0)}
                       </Text>
                     </View>
@@ -414,17 +414,17 @@ export default function DailyReportScreen() {
             {report.categories.length > 0 && (
               <View style={styles.section}>
                 <Text style={[styles.sectionTitle, { color: c.text }]}>Category Breakdown</Text>
-                <View style={[styles.table, { borderColor: c.border }]}>
-                  <View style={[styles.tableHeader, { backgroundColor: c.input }]}>
+                <View style={[styles.table, { borderColor: c.border, backgroundColor: c.card }]}>
+                  <View style={[styles.tableHeader, { backgroundColor: c.input, borderBottomColor: c.border, borderBottomWidth: 1 }]}>
                     <Text style={[styles.tableCell, styles.cellBold, { color: c.text, flex: 2 }]}>Category</Text>
                     <Text style={[styles.tableCell, styles.cellBold, { color: c.text, flex: 1 }]}>Qty</Text>
                     <Text style={[styles.tableCell, styles.cellBold, { color: c.text, flex: 1.5 }]}>Revenue</Text>
                     <Text style={[styles.tableCell, styles.cellBold, { color: c.text, flex: 1 }]}>%</Text>
                   </View>
                   {report.categories.map((cat: CategorySummary, idx: number) => (
-                    <View key={idx} style={[styles.tableRow, { borderTopColor: c.border }]}>
+                    <View key={idx} style={[styles.tableRow, { borderTopColor: c.border, backgroundColor: idx % 2 === 0 ? c.card : c.input }]}>
                       <Text style={[styles.tableCell, { color: c.text, flex: 2 }]}>{cat.category}</Text>
-                      <Text style={[styles.tableCell, { color: c.text, flex: 1 }]}>{cat.quantity_sold}</Text>
+                      <Text style={[styles.tableCell, { color: c.subtext, flex: 1 }]}>{cat.quantity_sold}</Text>
                       <Text style={[styles.tableCell, { color: c.success, flex: 1.5, fontWeight: 'bold' }]}>
                         {cat.total_revenue.toFixed(0)}
                       </Text>
@@ -446,32 +446,32 @@ export default function DailyReportScreen() {
                   data={report.orders}
                   keyExtractor={(item, idx) => idx.toString()}
                   renderItem={({ item }) => (
-                    <View style={[styles.orderCard, { backgroundColor: c.input, borderColor: c.border }]}>
-                      <View style={styles.orderRow}>
+                    <View style={[styles.orderCard, { backgroundColor: c.input, borderColor: c.border, borderLeftColor: c.primary, borderLeftWidth: 4 }]}>
+                      <View style={[styles.orderRow, { borderBottomColor: c.border }]}>
                         <Text style={[styles.orderLabel, { color: c.subtext }]}>Guest</Text>
-                        <Text style={[styles.orderValue, { color: c.text }]}>{item.guest_name}</Text>
+                        <Text style={[styles.orderValue, { color: c.text, fontWeight: '600' }]}>{item.guest_name}</Text>
                       </View>
-                      <View style={styles.orderRow}>
+                      <View style={[styles.orderRow, { borderBottomColor: c.border }]}>
                         <Text style={[styles.orderLabel, { color: c.subtext }]}>Table</Text>
                         <Text style={[styles.orderValue, { color: c.text }]}>{item.table_name}</Text>
                       </View>
-                      <View style={styles.orderRow}>
+                      <View style={[styles.orderRow, { borderBottomColor: c.border }]}>
                         <Text style={[styles.orderLabel, { color: c.subtext }]}>Waiter</Text>
                         <Text style={[styles.orderValue, { color: c.text }]}>{item.waiter_name || 'N/A'}</Text>
                       </View>
-                      <View style={styles.orderRow}>
+                      <View style={[styles.orderRow, { borderBottomColor: c.border }]}>
                         <Text style={[styles.orderLabel, { color: c.subtext }]}>Item</Text>
                         <Text style={[styles.orderValue, { color: c.text }]}>{item.menu_item_name}</Text>
                       </View>
-                      <View style={styles.orderRow}>
+                      <View style={[styles.orderRow, { borderBottomColor: c.border }]}>
                         <Text style={[styles.orderLabel, { color: c.subtext }]}>Qty × Price</Text>
-                        <Text style={[styles.orderValue, { color: c.text }]}>
+                        <Text style={[styles.orderValue, { color: c.success, fontWeight: '600' }]}>
                           {item.quantity} × {item.price_snapshot.toFixed(0)} = {item.subtotal.toFixed(0)}
                         </Text>
                       </View>
-                      <View style={styles.orderRow}>
+                      <View style={[styles.orderRow, { borderBottomWidth: 0 }]}>
                         <Text style={[styles.orderLabel, { color: c.subtext }]}>Time</Text>
-                        <Text style={[styles.orderValue, { color: c.text }]}>
+                        <Text style={[styles.orderValue, { color: c.subtext }]}>
                           {format(new Date(item.created_at), 'HH:mm:ss')}
                         </Text>
                       </View>
