@@ -1,20 +1,20 @@
-import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  Pressable,
-  FlatList,
-  Share,
-  ActivityIndicator,
-  Alert,
-} from 'react-native';
-import * as Print from 'expo-print';
 import { useTheme } from '@/context/ThemeContext';
 import { useReporting } from '@/hooks/useReporting';
+import { CategorySummary, OrderWithDetails, WaiterSummary } from '@/lib/types';
 import { format, subDays } from 'date-fns';
-import { OrderWithDetails, WaiterSummary, CategorySummary } from '@/lib/types';
+import * as Print from 'expo-print';
+import React, { useEffect, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  Pressable,
+  ScrollView,
+  Share,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 
 const Screen = ({ children }: any) => (
   <View style={styles.safeArea}>{children}</View>

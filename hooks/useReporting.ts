@@ -1,12 +1,12 @@
-import { useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import {
-  DailyReportSummary,
-  OrderWithDetails,
-  WaiterSummary,
-  CategorySummary,
-  DetailedReport,
+    CategorySummary,
+    DailyReportSummary,
+    DetailedReport,
+    OrderWithDetails,
+    WaiterSummary,
 } from '@/lib/types';
+import { useCallback, useState } from 'react';
 
 export const useReporting = () => {
   const [loading, setLoading] = useState(false);
@@ -31,10 +31,8 @@ export const useReporting = () => {
             guest_name,
             table_id,
             waiter_id,
-            table:tables(
-              name,
-              staff_profiles!waiter_id(name)
-            )
+            table:tables(name),
+            waiter:staff_profiles(name)
           ),
           menu_items(
             name,
@@ -85,7 +83,7 @@ export const useReporting = () => {
 
           const guest = order.guest;
           const table = guest?.table;
-          const waiter = guest?.staff_profiles?.[0];
+          const waiter = guest?.waiter;
           const menuItem = order.menu_items?.[0];
 
           orders.push({
