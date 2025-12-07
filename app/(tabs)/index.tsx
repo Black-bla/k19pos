@@ -545,7 +545,7 @@ export default function TablesScreen() {
           </View>
           <View style={styles.emptyAddTableContainer}>
             <Pressable
-              style={[styles.tableCard, styles.addTableCard]}
+              style={[styles.emptyAddTableCard]}
               onPress={() => setAddModalOpen(true)}
               android_ripple={{ color: theme.colors.ripple }}
             >
@@ -938,6 +938,17 @@ function createStyles(theme: any) {
       padding: 12,
       alignItems: 'center',
       justifyContent: 'center',
+    },
+    emptyAddTableCard: {
+      width: 180,
+      height: 180,
+      borderRadius: 12,
+      backgroundColor: c.card,
+      borderStyle: 'dashed',
+      borderWidth: 2,
+      borderColor: c.primary,
+      justifyContent: 'center',
+      alignItems: 'center',
     },
     loadingText: {
       fontSize: 16,
