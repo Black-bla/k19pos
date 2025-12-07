@@ -26,16 +26,14 @@ export const useReporting = () => {
           id,
           quantity,
           price_snapshot,
+          menu_item_name,
+          menu_item_id,
           guest:guests(
             id,
             guest_name,
             table_id,
             waiter_id,
             table:tables(name)
-          ),
-          menu_items(
-            name,
-            category
           ),
           created_at
         `
@@ -58,6 +56,21 @@ export const useReporting = () => {
       if (staffData) {
         staffData.forEach((staff: any) => {
           waiterNameMap.set(staff.id, staff.name || 'Unknown');
+        });
+      }
+
+      // 1c. Fetch menu items to get category information
+      const { data: menuData, error: menuError } = await supabase
+        .from('menu_items')
+        .select('id, name, category');
+
+      if (menuError) throw menuError;
+
+      // Create a map of menu item IDs to categories
+      const menuCategoryMap = new Map<string, string>();
+      if (menuData) {
+        menuData.forEach((item: any) => {
+          menuCategoryMap.set(item.id, item.category || 'Other');
         });
       }
 
@@ -99,14 +112,15 @@ export const useReporting = () => {
           const table = guest?.table;
           const waiter_id = guest?.waiter_id;
           const waiter_name = waiter_id ? waiterNameMap.get(waiter_id) : null;
-          const menuItem = order.menu_items?.[0];
+          const menu_item_name = order.menu_item_name || 'Unknown Item';
+          const menu_item_id = order.menu_item_id;
 
           orders.push({
             guest_id: guest?.id || '',
             guest_name: guest?.guest_name || 'Unknown',
             table_name: table?.name || 'N/A',
             waiter_name: waiter_name || null,
-            menu_item_name: menuItem?.name || 'Unknown Item',
+            menu_item_name: menu_item_name,
             quantity: order.quantity,
             price_snapshot: order.price_snapshot,
             subtotal,
@@ -135,17 +149,18 @@ export const useReporting = () => {
           }
 
           // Track category sales
-          const category = menuItem?.category || 'Other';
-          if (!categoryMap.has(category)) {
-            categoryMap.set(category, {
-              category,
+          const category = menu_item_id ? menuCategoryMap.get(menu_item_id) : 'Other';
+          const categoryName = category || 'Other';
+          if (!categoryMap.has(categoryName)) {
+            categoryMap.set(categoryName, {
+              category: categoryName,
               item_count: 1,
               quantity_sold: order.quantity,
               total_revenue: subtotal,
               percentage_of_sales: 0,
             });
           } else {
-            const categorySummary = categoryMap.get(category)!;
+            const categorySummary = categoryMap.get(categoryName)!;
             categorySummary.item_count += 1;
             categorySummary.quantity_sold += order.quantity;
             categorySummary.total_revenue += subtotal;
