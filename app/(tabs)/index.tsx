@@ -4,6 +4,7 @@ import OrderManagementScreen from '@/components/screens/OrderManagementScreen';
 import TableCard from "@/components/TableCard";
 import TableDetail from '@/components/TableDetail';
 import { dismissToast, showToast, updateToast } from '@/components/Toast';
+import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
 import { useTables } from "@/hooks/useTables";
 import { lipana } from "@/lib/lipana";
@@ -16,8 +17,12 @@ import { Alert, FlatList, Modal, Pressable, RefreshControl, ScrollView, StyleShe
 
 export default function TablesScreen() {
   const { theme } = useTheme();
+  const { user } = useAuth();
   const styles = useMemo(() => createStyles(theme), [theme]);
   const { tables, guestsByTable, reservedTables, loading, refetch, refetchAll } = useTables();
+  
+  // Filter state
+  const [showMyTablesOnly, setShowMyTablesOnly] = useState(false);
   
   // Add table modal
   const [addModalOpen, setAddModalOpen] = useState(false);
@@ -68,6 +73,12 @@ export default function TablesScreen() {
   
   // Refresh control state
   const [refreshing, setRefreshing] = useState(false);
+
+  // Filtered tables based on waiter filter
+  const filteredTables = useMemo(() => {
+    if (!showMyTablesOnly || !user?.id) return tables;
+    return tables.filter(table => table.waiter_id === user.id);
+  }, [tables, showMyTablesOnly, user?.id]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -491,6 +502,15 @@ export default function TablesScreen() {
       <View style={styles.header}>
         <View style={styles.headerButtons}>
           <Pressable 
+            style={[styles.filterBtn, showMyTablesOnly && styles.filterBtnActive]}
+            onPress={() => setShowMyTablesOnly(!showMyTablesOnly)}
+          >
+            <Ionicons name={showMyTablesOnly ? "funnel" : "funnel-outline"} size={18} color="#fff" />
+            <Text style={styles.filterBtnText}>
+              {showMyTablesOnly ? 'My Tables' : 'All Tables'}
+            </Text>
+          </Pressable>
+          <Pressable 
             style={styles.reservationsBtn} 
             onPress={() => router.push('/(tabs)/reservations')}
           >
@@ -508,14 +528,18 @@ export default function TablesScreen() {
       </View>
 
       {/* Tables Grid */}
-      {tables.length === 0 ? (
+      {filteredTables.length === 0 ? (
         <View style={styles.centerContent}>
-          <Text style={styles.emptyText}>No tables yet</Text>
-          <Text style={styles.emptySubtext}>Tap &quot;Add Table&quot; to get started</Text>
+          <Text style={styles.emptyText}>
+            {showMyTablesOnly ? 'No tables assigned to you' : 'No tables yet'}
+          </Text>
+          <Text style={styles.emptySubtext}>
+            {showMyTablesOnly ? 'Your assigned tables will appear here' : 'Tap "Add Table" to get started'}
+          </Text>
         </View>
       ) : (
         <FlatList
-          data={[...tables, { id: 'add-table' } as any]}
+          data={[...filteredTables, { id: 'add-table' } as any]}
           numColumns={2}
           contentContainerStyle={styles.grid}
           columnWrapperStyle={styles.row}
@@ -975,6 +999,32 @@ function createStyles(theme: any) {
       elevation: 8,
     },
     paymentsBtnText: {
+      color: '#fff',
+      fontSize: 15,
+      fontWeight: '800',
+      letterSpacing: 0.3,
+    },
+    filterBtn: {
+      backgroundColor: c.muted,
+      paddingHorizontal: 16,
+      paddingVertical: 13,
+      borderRadius: 12,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 7,
+      flex: 1,
+      shadowColor: c.muted,
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.2,
+      shadowRadius: 8,
+      elevation: 4,
+    },
+    filterBtnActive: {
+      backgroundColor: c.primary,
+      shadowColor: c.primary,
+    },
+    filterBtnText: {
       color: '#fff',
       fontSize: 15,
       fontWeight: '800',
