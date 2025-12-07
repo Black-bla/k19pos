@@ -14,6 +14,9 @@ export default function UsersScreen() {
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
   const { staffProfile } = useAuth();
+  const isAdmin = staffProfile?.role === 'admin';
+  const canChangeRoles = ['admin', 'manager', 'chef'].includes(staffProfile?.role ?? '');
+  const dayRoles = ['waiter', 'chef', 'manager', 'sommelier', 'bartender', 'host', 'runner', 'barista', 'cashier'];
   const [users, setUsers] = useState<StaffProfile[]>([]);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -24,13 +27,19 @@ export default function UsersScreen() {
   const [newName, setNewName] = useState('');
   const [newPhone, setNewPhone] = useState('');
   const [newRole, setNewRole] = useState('staff');
+  const [newDayRole, setNewDayRole] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [selectedAvatar, setSelectedAvatar] = useState<{ url: string; name: string } | null>(null);
   const [viewUser, setViewUser] = useState<StaffProfile | null>(null);
+  const [viewDayRole, setViewDayRole] = useState<string | null>(null);
 
   useEffect(() => {
     fetchUsers();
   }, []);
+
+  useEffect(() => {
+    setViewDayRole(viewUser?.day_role ?? null);
+  }, [viewUser]);
 
   async function fetchUsers() {
     setLoading(true);
@@ -55,38 +64,35 @@ export default function UsersScreen() {
   }
 
   async function changeRole(target: StaffProfile, newRole: string) {
+    Alert.alert('Roles are fixed', 'Default roles are immutable (admin or staff only). Use day roles for shift duties.');
+    return;
+  }
+
+  async function changeDayRole(target: StaffProfile, nextDayRole: string | null) {
     if (!staffProfile) return;
-    if (target.id === staffProfile.id) {
-      Alert.alert('Action not allowed', 'You cannot change your own role here.');
+    if (target.id === staffProfile.id && staffProfile.role !== 'admin' && staffProfile.role !== 'manager') {
+      Alert.alert('Action not allowed', 'Only managers or admins can change their own day role here.');
       return;
     }
-    if (target.role === 'admin') {
-      Alert.alert('Action not allowed', 'The admin role cannot be changed.');
-      return;
-    }
-    Alert.alert('Confirm role change', `Change ${target.name || target.id} to ${newRole}?`, [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Yes',
-        onPress: async () => {
-          setUpdatingId(target.id);
-          try {
-            const { error } = await supabase.from('staff_profiles').update({ role: newRole }).eq('id', target.id);
-            if (error) {
-              console.warn('update role error', error);
-              Alert.alert('Error', 'Unable to update role');
-            } else {
-              fetchUsers();
-            }
-          } catch (e) {
-            console.warn(e);
-            Alert.alert('Error', 'Unable to update role');
-          } finally {
-            setUpdatingId(null);
-          }
+    setUpdatingId(target.id);
+    try {
+      const { error } = await supabase.from('staff_profiles').update({ day_role: nextDayRole }).eq('id', target.id);
+      if (error) {
+        console.warn('update day role error', error);
+        Alert.alert('Error', 'Unable to update day role');
+      } else {
+        if (viewUser?.id === target.id) {
+          setViewDayRole(nextDayRole);
+          setViewUser({ ...target, day_role: nextDayRole });
         }
+        fetchUsers();
       }
-    ]);
+    } catch (e) {
+      console.warn(e);
+      Alert.alert('Error', 'Unable to update day role');
+    } finally {
+      setUpdatingId(null);
+    }
   }
 
   async function handleAddUser() {
@@ -124,7 +130,9 @@ export default function UsersScreen() {
         id: userId,
         name: newName,
         phone: newPhone || null,
+        email: newEmail,
         role: newRole,
+        day_role: newDayRole,
       });
 
       if (profileError) {
@@ -140,6 +148,7 @@ export default function UsersScreen() {
       setNewName('');
       setNewPhone('');
       setNewRole('staff');
+      setNewDayRole(null);
       fetchUsers();
     } catch (e) {
       console.warn('add user exception', e);
@@ -149,7 +158,7 @@ export default function UsersScreen() {
     }
   }
 
-  if (staffProfile?.role !== 'admin' && staffProfile?.role !== 'manager') {
+  if (!canChangeRoles) {
     return (
       <Screen style={styles.container}>
         <View style={styles.header}>
@@ -188,7 +197,8 @@ export default function UsersScreen() {
                   </Pressable>
                   <View style={{ flex: 1, marginLeft: 12 }}>
                     <Text style={styles.name}>{item.name || item.id}</Text>
-                    <Text style={styles.small}>{item.phone ?? item.id}</Text>
+                    <Text style={styles.small}>{item.phone ?? item.email ?? item.id}</Text>
+                    {item.day_role ? <Text style={styles.dayRoleTag}>Day role: {item.day_role}</Text> : null}
                   </View>
                   <View style={styles.roleReadOnly}>
                     <Text style={styles.roleReadOnlyText}>{item.role?.toUpperCase()}</Text>
@@ -243,24 +253,11 @@ export default function UsersScreen() {
                 </Pressable>
                 <View style={{ flex: 1, marginLeft: 12 }}>
                   <Text style={styles.name}>{item.name || item.id}</Text>
-                  <Text style={styles.small}>{item.phone ?? item.id}</Text>
+                  <Text style={styles.small}>{item.phone ?? item.email ?? item.id}</Text>
+                  {item.day_role ? <Text style={styles.dayRoleTag}>Day role: {item.day_role}</Text> : null}
                 </View>
-
-                <View style={{ flexDirection: 'row', gap: 8 }}>
-                    <Pressable
-                      style={[styles.roleBtn, item.role === 'manager' ? styles.roleBtnSelected : styles.roleBtnUnselected]}
-                      onPress={() => changeRole(item, 'manager')}
-                      disabled={updatingId === item.id || item.role === 'admin'}
-                    >
-                      <Text style={[styles.roleText, item.role === 'manager' ? styles.roleTextSelected : null]}>Manager</Text>
-                    </Pressable>
-                    <Pressable
-                      style={[styles.roleBtn, item.role === 'chef' ? styles.roleBtnSelected : styles.roleBtnUnselected]}
-                      onPress={() => changeRole(item, 'chef')}
-                      disabled={updatingId === item.id || item.role === 'admin'}
-                    >
-                      <Text style={[styles.roleText, item.role === 'chef' ? styles.roleTextSelected : null]}>Chef</Text>
-                    </Pressable>
+                <View style={styles.roleReadOnly}>
+                  <Text style={styles.roleReadOnlyText}>{item.role?.toUpperCase()}</Text>
                 </View>
               </Pressable>
             )}
@@ -307,25 +304,42 @@ export default function UsersScreen() {
             />
 
             <View style={styles.roleSelector}>
-              <Text style={styles.label}>Role:</Text>
-              <View style={{ flexDirection: 'row', gap: 8 }}>
+              <Text style={styles.label}>Default Role (immutable):</Text>
+              <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
                 <Pressable
                   style={[styles.roleBtn, newRole === 'staff' ? styles.roleBtnSelected : styles.roleBtnUnselected]}
                   onPress={() => setNewRole('staff')}
                 >
                   <Text style={[styles.roleText, newRole === 'staff' ? styles.roleTextSelected : null]}>Staff</Text>
                 </Pressable>
+                {isAdmin && (
+                  <Pressable
+                    style={[styles.roleBtn, newRole === 'admin' ? styles.roleBtnSelected : styles.roleBtnUnselected]}
+                    onPress={() => setNewRole('admin')}
+                  >
+                    <Text style={[styles.roleText, newRole === 'admin' ? styles.roleTextSelected : null]}>Admin</Text>
+                  </Pressable>
+                )}
+              </View>
+            </View>
+
+            <View style={styles.roleSelector}>
+              <Text style={styles.label}>Day Role (shift):</Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                {dayRoles.map((r) => (
+                  <Pressable
+                    key={r}
+                    style={[styles.roleBtn, newDayRole === r ? styles.roleBtnSelected : styles.roleBtnUnselected]}
+                    onPress={() => setNewDayRole(r)}
+                  >
+                    <Text style={[styles.roleText, newDayRole === r ? styles.roleTextSelected : null]}>{r.toUpperCase()}</Text>
+                  </Pressable>
+                ))}
                 <Pressable
-                  style={[styles.roleBtn, newRole === 'chef' ? styles.roleBtnSelected : styles.roleBtnUnselected]}
-                  onPress={() => setNewRole('chef')}
+                  style={[styles.roleBtn, newDayRole === null ? styles.roleBtnSelected : styles.roleBtnUnselected]}
+                  onPress={() => setNewDayRole(null)}
                 >
-                  <Text style={[styles.roleText, newRole === 'chef' ? styles.roleTextSelected : null]}>Chef</Text>
-                </Pressable>
-                <Pressable
-                  style={[styles.roleBtn, newRole === 'manager' ? styles.roleBtnSelected : styles.roleBtnUnselected]}
-                  onPress={() => setNewRole('manager')}
-                >
-                  <Text style={[styles.roleText, newRole === 'manager' ? styles.roleTextSelected : null]}>Manager</Text>
+                  <Text style={[styles.roleText, newDayRole === null ? styles.roleTextSelected : null]}>NONE</Text>
                 </Pressable>
               </View>
             </View>
@@ -392,8 +406,42 @@ export default function UsersScreen() {
                   <Text style={styles.viewValue}>{viewUser.phone || 'N/A'}</Text>
                 </View>
                 <View style={styles.viewFieldRow}>
+                  <Text style={styles.viewLabel}>Email</Text>
+                  <Text style={styles.viewValue}>{viewUser.email || 'N/A'}</Text>
+                </View>
+                <View style={styles.viewFieldRow}>
                   <Text style={styles.viewLabel}>User ID</Text>
                   <Text style={styles.viewValue}>{viewUser.id}</Text>
+                </View>
+
+                <View style={{ gap: 10 }}>
+                  <Text style={styles.viewLabel}>Default Role</Text>
+                  <View style={styles.roleReadOnly}>
+                    <Text style={styles.roleReadOnlyText}>{viewUser.role?.toUpperCase()}</Text>
+                  </View>
+                </View>
+
+                <View style={{ gap: 10 }}>
+                  <Text style={styles.viewLabel}>Day Role (shift)</Text>
+                  <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
+                    {dayRoles.map((r) => (
+                      <Pressable
+                        key={r}
+                        style={[styles.roleBtn, viewDayRole === r ? styles.roleBtnSelected : styles.roleBtnUnselected]}
+                        onPress={() => viewUser && changeDayRole(viewUser, r)}
+                        disabled={updatingId === viewUser?.id}
+                      >
+                        <Text style={[styles.roleText, viewDayRole === r ? styles.roleTextSelected : null]}>{r.toUpperCase()}</Text>
+                      </Pressable>
+                    ))}
+                    <Pressable
+                      style={[styles.roleBtn, viewDayRole === null ? styles.roleBtnSelected : styles.roleBtnUnselected]}
+                      onPress={() => viewUser && changeDayRole(viewUser, null)}
+                      disabled={updatingId === viewUser?.id}
+                    >
+                      <Text style={[styles.roleText, viewDayRole === null ? styles.roleTextSelected : null]}>NONE</Text>
+                    </Pressable>
+                  </View>
                 </View>
               </View>
             )}
@@ -419,6 +467,7 @@ function createStyles(theme: any) {
     avatarInitials: { color: c.subtext, fontWeight: '700', fontSize: 16 },
     name: { fontSize: 16, fontWeight: '700', color: c.text },
     small: { color: c.muted, fontSize: 12 },
+    dayRoleTag: { color: c.primary, fontSize: 12, fontWeight: '700', marginTop: 2 },
     roleBtn: { paddingVertical: 8, paddingHorizontal: 14, borderRadius: 999, justifyContent: 'center', alignItems: 'center', borderWidth: 1, minWidth: 74 },
     roleBtnSelected: { backgroundColor: c.primary, borderColor: c.primary },
     roleBtnUnselected: { backgroundColor: c.input, borderColor: c.border },

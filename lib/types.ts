@@ -95,6 +95,8 @@ export interface StaffProfile {
   role?: 'staff' | 'admin' | string | null;
   avatar_url?: string | null;
   phone?: string | null;
+  email?: string | null;
+  day_role?: string | null;
   created_at?: string | null;
 }
 

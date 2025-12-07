@@ -187,11 +187,42 @@ export default function TablesScreen() {
   }, [paymentToastId, payingGuestId]);
 
   async function fetchWaiters() {
-    const { data } = await supabase
-      .from('staff_profiles')
-      .select('id, name')
-      .order('name');
-    if (data) setWaiters(data);
+    try {
+      const { data, error } = await supabase
+        .from('staff_profiles')
+        .select('id, name, day_role')
+        .eq('day_role', 'waiter')
+        .order('name');
+
+      if (error) {
+        console.warn('fetchWaiters error', error);
+        setWaiters([]);
+        return;
+      }
+
+      if (data && data.length > 0) {
+        setWaiters(data);
+        return;
+      }
+
+      // Fallback: if no day-role waiters exist, surface staff so the list is not empty
+      const { data: fallback, error: fallbackError } = await supabase
+        .from('staff_profiles')
+        .select('id, name')
+        .eq('role', 'staff')
+        .order('name');
+
+      if (fallbackError) {
+        console.warn('fetchWaiters fallback error', fallbackError);
+        setWaiters([]);
+        return;
+      }
+
+      setWaiters(fallback || []);
+    } catch (e) {
+      console.warn('fetchWaiters exception', e);
+      setWaiters([]);
+    }
   }
 
   // ========== TABLE MANAGEMENT ==========
