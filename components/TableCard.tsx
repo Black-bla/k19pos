@@ -72,6 +72,7 @@ export default function TableCard({
       style={[
         styles.card,
         { backgroundColor: getCardBackground() },
+        showMenu && styles.cardElevated,
       ]}
       onPress={onPress}
       android_ripple={{ color: theme.colors.ripple }}
@@ -185,8 +186,8 @@ function createStyles(theme: any) {
       elevation: theme.isDark ? 0 : 3,
     },
     cardElevated: {
-      zIndex: 1000,
-      elevation: 10,
+      zIndex: 999,
+      elevation: 999,
     },
     topSection: {
       flexDirection: 'row',
@@ -309,8 +310,8 @@ function createStyles(theme: any) {
       shadowOffset: { width: 0, height: 4 },
       shadowOpacity: theme.isDark ? 0.3 : 0.15,
       shadowRadius: 8,
-      elevation: theme.isDark ? 8 : 10,
-      zIndex: 1001,
+      elevation: 1000,
+      zIndex: 1000,
     },
     menuItem: {
       flexDirection: 'row',
